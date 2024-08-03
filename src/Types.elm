@@ -8,12 +8,12 @@ import Url exposing (Url)
 
 type alias FrontendModel =
     { key : Key
-    , message : String
+    , gameState : GameState
     }
 
 
 type alias BackendModel =
-    { message : String
+    {
     }
 
 
@@ -21,6 +21,7 @@ type FrontendMsg
     = UrlClicked UrlRequest
     | UrlChanged Url
     | NoOpFrontendMsg
+    | GameMsg GameMsg
 
 
 type ToBackend
@@ -87,6 +88,10 @@ type alias GameState =
 
 
 type GameMsg
-    = Tick Time.Posix
+    = FrameTick Time.Posix
     | FireProjectile Ship
     | MoveShip Ship Vector2D
+
+
+moment : Float
+moment = 1000 / 24
