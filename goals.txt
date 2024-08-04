@@ -1,0 +1,6 @@
+2024-08-04
+----------
++ Improve structure of files
++ Get movement of one ship correct (meaning accelleration + controls)
+--
+* Gravity (bonus)

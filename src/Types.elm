@@ -13,8 +13,7 @@ type alias FrontendModel =
 
 
 type alias BackendModel =
-    {
-    }
+    {}
 
 
 type FrontendMsg
@@ -47,6 +46,9 @@ type alias Ship =
     , crew : Int
     , energy : Int
     , shipType : ShipType
+    , radius : Float
+    , mass : Float
+    , thrust : Float -- the force of the ship's engines
     }
 
 
@@ -55,8 +57,10 @@ type ShipType
 
 
 type alias Projectile =
-    { position : Vector2D
+    { mass : Float
+    , position : Vector2D
     , velocity : Vector2D
+    , radius : Float
     , damage : Int
     , lifetime : Float
     }
@@ -67,6 +71,18 @@ type alias Planet =
     , radius : Float
     , gravity : Float
     }
+
+
+type alias Body a =
+    { a
+        | mass : Float
+        , position : Vector2D
+        , velocity : Vector2D
+        , radius : Float
+    }
+
+type alias Rocket a =
+    Body { a | rotation : Float, thrust : Float }
 
 
 type alias Vector2D =
@@ -80,7 +96,21 @@ type alias GameState =
     , projectiles : List Projectile
     , planet : Planet
     , timeElapsed : Float
+    , space : Space
     }
+
+
+type alias Space =
+    { width : Float
+    , height : Float
+    }
+
+type Direction
+    = Left
+    | Right
+
+
+type alias Force = Float
 
 
 
@@ -88,10 +118,13 @@ type alias GameState =
 
 
 type GameMsg
-    = FrameTick Time.Posix
-    | FireProjectile Ship
-    | MoveShip Ship Vector2D
+    = NoAction
+    | FrameTick Time.Posix
+    | FireProjectile 
+    | Rotate Direction
+    | Accelerate 
 
 
 moment : Float
-moment = 1000 / 24
+moment =
+    1000 / 24

@@ -1,10 +1,13 @@
 module Frontend exposing (..)
 
 import Browser exposing (UrlRequest(..))
+import Browser.Events
 import Browser.Navigation as Nav
 import Html exposing (Html)
 import Html.Attributes as Attr
+import Json.Decode as Decode
 import Lamdera
+import Physics exposing (..)
 import Svg exposing (..)
 import Svg.Attributes as SvgAttr
 import Time
@@ -30,7 +33,10 @@ app =
 
 subscriptions : Model -> Sub FrontendMsg
 subscriptions _ =
-    Time.every (1000 / 24) (\time -> GameMsg (FrameTick time))
+    Sub.batch
+        [ Time.every (1000 / 24) (\time -> GameMsg (FrameTick time))
+        , subscribeToKeyPresses
+        ]
 
 
 init : Url.Url -> Nav.Key -> ( Model, Cmd FrontendMsg )
@@ -74,10 +80,10 @@ updateGame msg model =
             --update the position of the ships and based on their velocity
             let
                 newShips =
-                    model.gameState.ships |> List.map (updatePosition time)
+                    model.gameState.ships |> List.map (move model.gameState.space)
 
                 newProjectiles =
-                    model.gameState.projectiles |> List.map (updatePosition time)
+                    model.gameState.projectiles |> List.map (move model.gameState.space)
 
                 oldGameState =
                     model.gameState
@@ -91,34 +97,53 @@ updateGame msg model =
             in
             ( { model | gameState = newGameState }, Cmd.none )
 
-        FireProjectile projectile ->
+        FireProjectile ->
             ( model, Cmd.none )
 
-        MoveShip ship acceleration ->
+        Rotate direction ->
+            case model.gameState.ships of
+                [firstShip, secondShip] ->
+                    let
+                        newFirstShip =
+                            rotate direction firstShip
+
+                        oldGameState =
+                            model.gameState
+
+                        newGameState =
+                            { oldGameState | ships = [newFirstShip, secondShip] }
+
+                        newModel =
+                            { model | gameState = newGameState }
+                    in
+                    ( newModel, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        Accelerate ->
+            case model.gameState.ships of
+                [firstShip, secondShip ] ->
+                    let
+                        newFirstShip =
+                            thrust firstShip
+
+                        oldGameState =
+                            model.gameState
+
+                        newGameState =
+                            { oldGameState | ships = [newFirstShip, secondShip] }
+
+                        newModel =
+                            { model | gameState = newGameState }
+                    in
+                    ( newModel, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        NoAction ->
             ( model, Cmd.none )
-
-
-updatePosition time thing =
-    let
-        newX = (thing.position.x + thing.velocity.x * moment) |> wrapCoordinate 800
-        newY = (thing.position.y + thing.velocity.y * moment) |> wrapCoordinate 600
-    in
-    { thing
-        | position =
-            { x = newX
-            , y = newY
-            }
-    }
-
-
-wrapCoordinate : Float -> Float -> Float
-wrapCoordinate max value =
-    if value < 0 then
-        max + (value |> round |> modBy (round max) |> toFloat)
-    else if value > max then
-        value |> round |> modBy (round max) |> toFloat
-    else
-        value
 
 
 updateFromBackend : ToFrontend -> Model -> ( Model, Cmd FrontendMsg )
@@ -159,18 +184,24 @@ initState : GameState
 initState =
     { ships =
         [ { position = { x = 100, y = 100 }
-          , velocity = { x = 0.01, y = -0.01 }
-          , rotation = 2
+          , velocity = { x = 0.0, y = 0.0 }
+          , rotation = 0
           , crew = 5
           , energy = 100
           , shipType = Triangle
+          , radius = 20
+          , mass = 100
+          , thrust = 1
           }
         , { position = { x = 700, y = 500 }
           , velocity = { x = 0, y = 0 }
-          , rotation = 3.14 -- Approximately PI, facing the opposite direction
+          , rotation = 0
           , crew = 3
           , energy = 80
           , shipType = Triangle
+          , radius = 20
+          , mass = 100
+          , thrust = 1
           }
         ]
     , projectiles = [] -- No projectiles (pew pew) as requested
@@ -180,6 +211,7 @@ initState =
         , gravity = 9.8
         }
     , timeElapsed = 0
+    , space = { width = 800, height = 600 }
     }
 
 
@@ -232,9 +264,9 @@ renderShip ship =
 
         shipPoints =
             String.join " "
-                [ "0,-10" -- nose
-                , "5,10" -- right corner
-                , "-5,10" -- left corner
+                [ "10,0" -- nose (rotated right by 90 degrees)
+                , "-10,5" -- right corner (now bottom corner)
+                , "-10,-5" -- left corner (now top corner)
                 ]
     in
     g
@@ -280,3 +312,30 @@ renderProjectile projectile =
         , SvgAttr.fill "yellow"
         ]
         []
+
+
+subscribeToKeyPresses : Sub FrontendMsg
+subscribeToKeyPresses =
+    Browser.Events.onKeyDown (Decode.map keyPressed keyDecoder)
+        |> Sub.map GameMsg
+
+
+keyDecoder : Decode.Decoder String
+keyDecoder =
+    Decode.field "key" Decode.string
+
+
+keyPressed : String -> GameMsg
+keyPressed key =
+    case String.toLower key of
+        "w" ->
+            Accelerate
+
+        "a" ->
+            Rotate Left
+
+        "d" ->
+            Rotate Right
+
+        _ ->
+            NoAction

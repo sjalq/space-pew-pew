@@ -20,7 +20,7 @@ app =
 
 init : ( Model, Cmd BackendMsg )
 init =
-    ( { }
+    ( {}
     , Cmd.none
     )
 
@@ -37,3 +37,4 @@ updateFromFrontend sessionId clientId msg model =
     case msg of
         NoOpToBackend ->
             ( model, Cmd.none )
+
