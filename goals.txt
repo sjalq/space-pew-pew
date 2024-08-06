@@ -14,5 +14,6 @@
 
 2024-08-06
 ----------
++ Collisions
 * Gravity 
 * Better ship graphic (bonus)

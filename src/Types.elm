@@ -8,7 +8,7 @@ import Url exposing (Url)
 
 type alias FrontendModel =
     { key : Key
-    , gameState : GameState
+    , gameState : AltGameState
     }
 
 
@@ -20,7 +20,7 @@ type FrontendMsg
     = UrlClicked UrlRequest
     | UrlChanged Url
     | NoOpFrontendMsg
-    | GameMsg GameMsg
+    | GameMsg AltGameMsg
 
 
 type ToBackend
@@ -33,6 +33,26 @@ type BackendMsg
 
 type ToFrontend
     = NoOpToFrontend
+
+
+
+-- alt physics types stating with body and defining more specific types
+
+
+type alias AltBody =
+    { id : Int
+    , mass : Float
+    , position : Vector2D
+    , velocity : Vector2D
+    , radius : Float
+    , bodyType : BodyType
+    }
+
+
+type BodyType
+    = AltPlanet { gravity : Float }
+    | AltShip { rotation : Float, thrust : Float, rotationSpeed : Float }
+    | AltProjectile { damage : Int, lifetime : Float }
 
 
 
@@ -71,6 +91,7 @@ type alias Planet =
     { position : Vector2D
     , radius : Float
     , gravity : Float
+    , mass : Float
     }
 
 
@@ -81,6 +102,13 @@ type alias Body a =
         , velocity : Vector2D
         , radius : Float
     }
+
+
+
+-- type BodyType
+--     = Planet { gravity : Float }
+--     | Rocket { rotation : Float, thrust : Float }
+--     | Projectile { damage : Int, lifetime : Float }
 
 
 type alias Rocket a =
@@ -95,6 +123,13 @@ type alias Rocket a =
 type alias Vector2D =
     { x : Float
     , y : Float
+    }
+
+
+type alias AltGameState =
+    { bodies : List AltBody
+    , timeElapsed : Float
+    , space : Space
     }
 
 
@@ -126,7 +161,7 @@ type alias Force =
 -- Game Loop
 
 
-type GameMsg
+type AltGameMsg
     = NoAction
     | FrameTick Time.Posix
     | FireProjectile

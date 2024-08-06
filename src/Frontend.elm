@@ -3,10 +3,12 @@ module Frontend exposing (..)
 import Browser exposing (UrlRequest(..))
 import Browser.Events
 import Browser.Navigation as Nav
+import Dict
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Json.Decode as Decode
 import Lamdera
+import List.Extra
 import Physics exposing (..)
 import RenderSvg exposing (renderGame)
 import Svg exposing (..)
@@ -42,7 +44,7 @@ subscriptions _ =
 init : Url.Url -> Nav.Key -> ( Model, Cmd FrontendMsg )
 init url key =
     ( { key = key
-      , gameState = initState
+      , gameState = initAltState
       }
     , Cmd.none
     )
@@ -80,22 +82,21 @@ update msg model =
             ( newModel, cmd )
 
 
-updateGame : GameMsg -> GameState -> ( GameState, Cmd FrontendMsg )
+updateGame : AltGameMsg -> AltGameState -> ( AltGameState, Cmd FrontendMsg )
 updateGame msg gameState =
     case msg of
         FrameTick time ->
-            --update the position of the ships and based on their velocity
             let
-                newShips =
-                    gameState.ships |> List.map (move gameState.space)
+                newBodies =
+                    gameState.bodies |> List.map (move gameState.space)
 
-                newProjectiles =
-                    gameState.projectiles |> List.map (move gameState.space)
+                finalBodies =
+                    altPerformCollisions
+                        newBodies
 
                 newGameState =
                     { gameState
-                        | ships = newShips
-                        , projectiles = newProjectiles
+                        | bodies = finalBodies
                         , timeElapsed = gameState.timeElapsed + moment
                     }
             in
@@ -105,34 +106,51 @@ updateGame msg gameState =
             ( gameState, Cmd.none )
 
         Rotate direction ->
-            case gameState.ships of
-                [ firstShip, secondShip ] ->
-                    let
-                        newFirstShip =
-                            rotate direction firstShip
+            let
+                firstShip =
+                    gameState.bodies
+                        |> List.filter isShip
+                        |> List.sortBy .id
+                        |> List.head
+            in
+            ( { gameState
+                | bodies =
+                    gameState.bodies
+                        |> List.map
+                            (\body ->
+                                if Just body.id == (firstShip |> Maybe.map .id) then
+                                    altRotate direction body
 
-                        newGameState =
-                            { gameState | ships = [ newFirstShip, secondShip ] }
-                    in
-                    ( newGameState, Cmd.none )
-
-                _ ->
-                    ( gameState, Cmd.none )
+                                else
+                                    body
+                            )
+              }
+              --( gameState
+            , Cmd.none
+            )
 
         Accelerate ->
-            case gameState.ships of
-                [ firstShip, secondShip ] ->
-                    let
-                        newFirstShip =
-                            rocket_thrust firstShip
+            let
+                firstShip =
+                    gameState.bodies
+                        |> List.filter isShip
+                        |> List.sortBy .id
+                        |> List.head
+            in
+            ( { gameState
+                | bodies =
+                    gameState.bodies
+                        |> List.map
+                            (\body ->
+                                if Just body.id == (firstShip |> Maybe.map .id) then
+                                    altRocket_thrust body
 
-                        newGameState =
-                            { gameState | ships = [ newFirstShip, secondShip ] }
-                    in
-                    ( newGameState, Cmd.none )
-
-                _ ->
-                    ( gameState, Cmd.none )
+                                else
+                                    body
+                            )
+              }
+            , Cmd.none
+            )
 
         NoAction ->
             ( gameState, Cmd.none )
@@ -162,12 +180,12 @@ view model =
     }
 
 
-gameMsgToFrontendMsg : GameMsg -> FrontendMsg
+gameMsgToFrontendMsg : AltGameMsg -> FrontendMsg
 gameMsgToFrontendMsg msg =
     GameMsg msg
 
 
-htmlGameMsg : Html GameMsg -> Html FrontendMsg
+htmlGameMsg : Html AltGameMsg -> Html FrontendMsg
 htmlGameMsg =
     Html.map gameMsgToFrontendMsg
 
@@ -181,7 +199,7 @@ initState =
           , crew = 5
           , energy = 100
           , shipType = Triangle
-          , radius = 20
+          , radius = 100
           , mass = 100
           , thrust = 1
           , rotationSpeed = 0.5
@@ -192,7 +210,7 @@ initState =
           , crew = 3
           , energy = 80
           , shipType = Triangle
-          , radius = 20
+          , radius = 100
           , mass = 100
           , thrust = 1
           , rotationSpeed = 0.1
@@ -203,10 +221,53 @@ initState =
         { position = { x = 400, y = 300 }
         , radius = 50
         , gravity = 9.8
+        , mass = 1000
         }
     , timeElapsed = 0
     , space = { width = 800, height = 600 }
     }
+
+
+initAltState : AltGameState
+initAltState =
+    { bodies =
+        [ { id = 1
+          , mass = 100
+          , position = { x = 400, y = 300 }
+          , velocity = { x = 0, y = 0 }
+          , radius = 20
+          , bodyType = AltPlanet { gravity = 9.8 }
+          }
+        , { id = 2
+          , mass = 50
+          , position = { x = 100, y = 100 }
+          , velocity = { x = 0, y = 0 }
+          , radius = 100
+          , bodyType = AltShip { rotation = 0, thrust = 1, rotationSpeed = 0.1 }
+          }
+        , { id = 3
+          , mass = 50
+          , position = { x = 700, y = 500 }
+          , velocity = { x = 0, y = 0 }
+          , radius = 100
+          , bodyType = AltShip { rotation = 0, thrust = 1, rotationSpeed = 0.1 }
+          }
+
+        -- , { id = 4
+        --   , mass = 10
+        --   , position = { x = 500, y = 500 }
+        --   , velocity = { x = 0, y = 0 }
+        --   , radius = 5
+        --   , bodyType = AltProjectile { damage = 5, lifetime = 10 }
+        --   }
+        ]
+    , timeElapsed = 0
+    , space = { width = 800, height = 600 }
+    }
+
+
+listOfBodies model =
+    model.gameState.ships ++ model.gameState.projectiles
 
 
 subscribeToKeyPresses : Sub FrontendMsg
@@ -220,7 +281,7 @@ keyDecoder =
     Decode.field "key" Decode.string
 
 
-keyPressed : String -> GameMsg
+keyPressed : String -> AltGameMsg
 keyPressed key =
     case String.toLower key of
         "w" ->
@@ -234,3 +295,24 @@ keyPressed key =
 
         _ ->
             NoAction
+
+
+
+-- checkAllCollisions : List (Body a) -> List (Body a)
+-- checkAllCollisions bodies =
+--     bodies
+--         |> List.concatMap
+--             (\body ->
+--                 bodies
+--                     |> List.map (\other -> Physics.checkCollision body other)
+--             )
+
+
+altPerformCollisions : List AltBody -> List AltBody
+altPerformCollisions bodies =
+    bodies
+        |> List.concatMap (\body -> bodies |> List.map (\other -> Physics.collide body other))
+        |> List.concatMap (\( a, b ) -> [ a, b ])
+        |> List.map (\body -> ( body.id, body ))
+        |> Dict.fromList
+        |> Dict.values

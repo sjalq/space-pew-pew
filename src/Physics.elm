@@ -28,6 +28,24 @@ angleToV magnitude angle =
     }
 
 
+normalizeV : Vector2D -> Vector2D
+normalizeV vec =
+    let
+        magnitude =
+            sqrt (vec.x ^ 2 + vec.y ^ 2)
+    in
+    if magnitude > 0 then
+        scaleV (1 / magnitude) vec
+
+    else
+        vec
+
+
+dotProduct : Vector2D -> Vector2D -> Float
+dotProduct v1 v2 =
+    v1.x * v2.x + v1.y * v2.y
+
+
 wrapVectorToSpace : Space -> Vector2D -> Vector2D
 wrapVectorToSpace space vec =
     let
@@ -69,16 +87,26 @@ applyForce force body =
     in
     { body | velocity = addV body.velocity acceleration }
 
+
+altApplyForce : Vector2D -> AltBody -> AltBody
+altApplyForce force body =
+    let
+        acceleration =
+            scaleV (1 / body.mass) force
+    in
+    { body | velocity = addV body.velocity acceleration }
+
+
 gravitationalForce : Body a -> Body a -> Vector2D
 gravitationalForce bodyA bodyB =
     let
         distance =
-            sqrt ((bodyA.position.x - bodyB.position.x) ^ 2 + (bodyA.position.y - bodyB.position.y) ^ 2)
+            sqrt ((bodyA.position.x - bodyB.position.x) ^ 2 + (bodyB.position.y - bodyA.position.y) ^ 2)
 
         angleBetween =
             atan2 (bodyB.position.y - bodyA.position.y) (bodyB.position.x - bodyA.position.x)
     in
-    angleBetween |> angleToV (bodyA.mass * bodyB.mass / distance ^ 2) 
+    angleBetween |> angleToV (bodyA.mass * bodyB.mass / distance ^ 2)
 
 
 centerOfMass : List (Body a) -> Vector2D
@@ -95,6 +123,7 @@ centerOfMass bodies =
     in
     if totalMass > 0 then
         scaleV (1 / totalMass) sumPositions
+
     else
         { x = 0, y = 0 }
 
@@ -102,6 +131,16 @@ centerOfMass bodies =
 rocket_thrust : Rocket a -> Rocket a
 rocket_thrust rocket =
     rocket |> applyForce (angleToV rocket.thrust rocket.rotation)
+
+
+altRocket_thrust : AltBody -> AltBody
+altRocket_thrust body =
+    case body.bodyType of
+        AltShip ship ->
+            body |> altApplyForce (angleToV ship.thrust ship.rotation)
+
+        _ ->
+            body
 
 
 checkCollision : Body a -> Body a -> Bool
@@ -113,37 +152,59 @@ checkCollision bodyA bodyB =
     distance <= bodyA.radius + bodyB.radius
 
 
-transferMomentum : Body a -> Body a -> ( Body a, Body a )
-transferMomentum bodyA bodyB =
+altCheckCollision : AltBody -> AltBody -> Bool
+altCheckCollision bodyA bodyB =
     let
-        totalMass =
-            bodyA.mass + bodyB.mass
-
-        calculateNewVelocity body otherBody =
-            let
-                massRatio =
-                    body.mass / totalMass
-
-                otherMassRatio =
-                    otherBody.mass / totalMass
-            in
-            addV
-                (scaleV massRatio body.velocity)
-                (scaleV otherMassRatio otherBody.velocity)
-
-        newVelocityA =
-            calculateNewVelocity bodyA bodyB
-
-        newVelocityB =
-            calculateNewVelocity bodyB bodyA
-
-        newBodyA =
-            { bodyA | velocity = newVelocityA }
-
-        newBodyB =
-            { bodyB | velocity = newVelocityB }
+        distance =
+            sqrt ((bodyA.position.x - bodyB.position.x) ^ 2 + (bodyA.position.y - bodyB.position.y) ^ 2)
     in
-    ( newBodyA, newBodyB )
+    distance <= bodyA.radius + bodyB.radius
+
+
+collide : AltBody -> AltBody -> ( AltBody, AltBody )
+collide bodyA bodyB =
+    if (bodyA.id /= bodyB.id) && altCheckCollision bodyA bodyB then
+        let
+            _ =
+                Debug.log "collide" ( bodyA.id, bodyB.id )
+
+            normal =
+                Vector2D
+                    (bodyB.position.x - bodyA.position.x)
+                    (bodyB.position.y - bodyA.position.y)
+                    |> normalizeV
+
+            relativeVelocity =
+                Vector2D
+                    (bodyB.velocity.x - bodyA.velocity.x)
+                    (bodyB.velocity.y - bodyA.velocity.y)
+
+            velocityAlongNormal =
+                dotProduct relativeVelocity normal
+
+            -- Coefficient of restitution (elasticity)
+            e =
+                0.8
+
+            -- Impulse scalar
+            j =
+                -(1 + e) * velocityAlongNormal / (1 / bodyA.mass + 1 / bodyB.mass)
+
+            impulse =
+                scaleV j normal
+
+            newVelocityA =
+                addV bodyA.velocity (scaleV (-1 / bodyA.mass) impulse)
+
+            newVelocityB =
+                addV bodyB.velocity (scaleV (1 / bodyB.mass) impulse)
+        in
+        ( { bodyA | velocity = newVelocityA }
+        , { bodyB | velocity = newVelocityB }
+        )
+
+    else
+        ( bodyA, bodyB )
 
 
 degreesToRadians : Float -> Float
@@ -163,3 +224,52 @@ rotate direction rocket =
                     rocket.rotation + rocket.rotationSpeed
     in
     { rocket | rotation = newRotation }
+
+
+altRotate : Direction -> AltBody -> AltBody
+altRotate direction body =
+    let
+        newBodyType =
+            case body.bodyType of
+                AltShip ship ->
+                    case direction of
+                        Left ->
+                            AltShip { ship | rotation = ship.rotation - ship.rotationSpeed }
+
+                        Right ->
+                            AltShip { ship | rotation = ship.rotation + ship.rotationSpeed }
+
+                _ ->
+                    body.bodyType
+    in
+    { body | bodyType = newBodyType }
+
+
+isShip : AltBody -> Bool
+isShip body =
+    case body.bodyType of
+        AltShip _ ->
+            True
+
+        _ ->
+            False
+
+
+isPlanet : AltBody -> Bool
+isPlanet body =
+    case body.bodyType of
+        AltPlanet _ ->
+            True
+
+        _ ->
+            False
+
+
+isProjectile : AltBody -> Bool
+isProjectile body =
+    case body.bodyType of
+        AltProjectile _ ->
+            True
+
+        _ ->
+            False
