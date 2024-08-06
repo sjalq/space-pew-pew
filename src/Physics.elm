@@ -1,56 +1,107 @@
 module Physics exposing (..)
 
 import Types exposing (..)
-import Html exposing (a)
+
+
+
+-- Vector operations
+
+
+addV : Vector2D -> Vector2D -> Vector2D
+addV v1 v2 =
+    { x = v1.x + v2.x
+    , y = v1.y + v2.y
+    }
+
+
+scaleV : Float -> Vector2D -> Vector2D
+scaleV scalar vec =
+    { x = scalar * vec.x
+    , y = scalar * vec.y
+    }
+
+
+angleToV : Float -> Float -> Vector2D
+angleToV magnitude angle =
+    { x = magnitude * cos angle
+    , y = magnitude * sin angle
+    }
+
+
+wrapVectorToSpace : Space -> Vector2D -> Vector2D
+wrapVectorToSpace space vec =
+    let
+        wrapCoordinate max value =
+            if value < 0 then
+                max + (value |> round |> modBy (round max) |> toFloat)
+
+            else if value > max then
+                value |> round |> modBy (round max) |> toFloat
+
+            else
+                value
+    in
+    { x = wrapCoordinate space.width vec.x
+    , y = wrapCoordinate space.height vec.y
+    }
+
+
+
+-- Physics
 
 
 move : Space -> Body a -> Body a
 move space body =
     let
-        newX =
-            (body.position.x + body.velocity.x * moment) |> wrapCoordinate space.width
-
-        newY =
-            (body.position.y + body.velocity.y * moment) |> wrapCoordinate space.height
+        newPosition =
+            body.position
+                |> addV (scaleV moment body.velocity)
+                |> wrapVectorToSpace space
     in
-    { body
-        | position =
-            { x = newX
-            , y = newY
-            }
-    }
+    { body | position = newPosition }
 
-accelerationFromThrustToMass : Float -> Float -> Float
-accelerationFromThrustToMass thrust_ mass =
-    thrust_ / mass
 
-thrust : Rocket a -> Rocket a
-thrust rocket =
+applyForce : Vector2D -> Body a -> Body a
+applyForce force body =
     let
         acceleration =
-            accelerationFromThrustToMass rocket.thrust rocket.mass
+            scaleV (1 / body.mass) force
     in
-    accelerate acceleration rocket
+    { body | velocity = addV body.velocity acceleration }
 
-
-accelerate : Float ->  Rocket a -> Rocket a
-accelerate acceleration rocket =
+gravitationalForce : Body a -> Body a -> Vector2D
+gravitationalForce bodyA bodyB =
     let
-        oldVelocity =
-            rocket.velocity
+        distance =
+            sqrt ((bodyA.position.x - bodyB.position.x) ^ 2 + (bodyA.position.y - bodyB.position.y) ^ 2)
 
-        rotation =
-            rocket.rotation
-
-        accelerationVector =
-            { x = acceleration * cos rotation, y = acceleration * sin rotation }
-
-        newVelocity =
-            { oldVelocity | x = oldVelocity.x + accelerationVector.x, y = oldVelocity.y + accelerationVector.y }
+        angleBetween =
+            atan2 (bodyB.position.y - bodyA.position.y) (bodyB.position.x - bodyA.position.x)
     in
-    { rocket
-        | velocity = newVelocity
-    }
+    angleBetween |> angleToV (bodyA.mass * bodyB.mass / distance ^ 2) 
+
+
+centerOfMass : List (Body a) -> Vector2D
+centerOfMass bodies =
+    let
+        totalMass =
+            List.foldl (\body acc -> acc + body.mass) 0 bodies
+
+        weightedPositions =
+            List.map (\body -> scaleV body.mass body.position) bodies
+
+        sumPositions =
+            List.foldl addV { x = 0, y = 0 } weightedPositions
+    in
+    if totalMass > 0 then
+        scaleV (1 / totalMass) sumPositions
+    else
+        { x = 0, y = 0 }
+
+
+rocket_thrust : Rocket a -> Rocket a
+rocket_thrust rocket =
+    rocket |> applyForce (angleToV rocket.thrust rocket.rotation)
 
 
 checkCollision : Body a -> Body a -> Bool
@@ -68,49 +119,32 @@ transferMomentum bodyA bodyB =
         totalMass =
             bodyA.mass + bodyB.mass
 
-        thing1Velocity =
-            bodyA.velocity
+        calculateNewVelocity body otherBody =
+            let
+                massRatio =
+                    body.mass / totalMass
 
-        thing2Velocity =
-            bodyB.velocity
+                otherMassRatio =
+                    otherBody.mass / totalMass
+            in
+            addV
+                (scaleV massRatio body.velocity)
+                (scaleV otherMassRatio otherBody.velocity)
 
-        newVelocity1 =
-            { bodyA
-                | velocity =
-                    { thing1Velocity
-                        | x = thing1Velocity.x * (bodyA.mass / totalMass)
-                        , y = thing1Velocity.y * (bodyA.mass / totalMass)
-                    }
-            }
+        newVelocityA =
+            calculateNewVelocity bodyA bodyB
 
-        newVelocity2 =
-            { bodyB
-                | velocity =
-                    { thing2Velocity
-                        | x = thing2Velocity.x * (bodyB.mass / totalMass)
-                        , y = thing2Velocity.y * (bodyB.mass / totalMass)
-                    }
-            }
+        newVelocityB =
+            calculateNewVelocity bodyB bodyA
 
-        newThing1 =
-            { bodyA | velocity = newVelocity1.velocity }
+        newBodyA =
+            { bodyA | velocity = newVelocityA }
 
-        newThing2 =
-            { bodyB | velocity = newVelocity2.velocity }
+        newBodyB =
+            { bodyB | velocity = newVelocityB }
     in
-    ( newThing1, newThing2 )
+    ( newBodyA, newBodyB )
 
-
-wrapCoordinate : Float -> Float -> Float
-wrapCoordinate max value =
-    if value < 0 then
-        max + (value |> round |> modBy (round max) |> toFloat)
-
-    else if value > max then
-        value |> round |> modBy (round max) |> toFloat
-
-    else
-        value
 
 degreesToRadians : Float -> Float
 degreesToRadians degrees =
@@ -118,15 +152,14 @@ degreesToRadians degrees =
 
 
 rotate : Direction -> Rocket a -> Rocket a
-rotate direction thing=
+rotate direction rocket =
     let
-        -- remember to rotate by radians == 5 degrees
         newRotation =
             case direction of
                 Left ->
-                    thing.rotation - (degreesToRadians 5)
+                    rocket.rotation - rocket.rotationSpeed
 
                 Right ->
-                    thing.rotation + (degreesToRadians 5)
+                    rocket.rotation + rocket.rotationSpeed
     in
-    { thing | rotation = newRotation }
+    { rocket | rotation = newRotation }

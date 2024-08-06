@@ -49,6 +49,7 @@ type alias Ship =
     , radius : Float
     , mass : Float
     , thrust : Float -- the force of the ship's engines
+    , rotationSpeed : Float
     }
 
 
@@ -81,8 +82,14 @@ type alias Body a =
         , radius : Float
     }
 
+
 type alias Rocket a =
-    Body { a | rotation : Float, thrust : Float }
+    Body
+        { a
+            | rotation : Float
+            , thrust : Float
+            , rotationSpeed : Float
+        }
 
 
 type alias Vector2D =
@@ -105,12 +112,14 @@ type alias Space =
     , height : Float
     }
 
+
 type Direction
     = Left
     | Right
 
 
-type alias Force = Float
+type alias Force =
+    Float
 
 
 
@@ -120,9 +129,9 @@ type alias Force = Float
 type GameMsg
     = NoAction
     | FrameTick Time.Posix
-    | FireProjectile 
+    | FireProjectile
     | Rotate Direction
-    | Accelerate 
+    | Accelerate
 
 
 moment : Float

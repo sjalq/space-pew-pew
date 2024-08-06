@@ -4,3 +4,15 @@
 + Get movement of one ship correct (meaning accelleration + controls)
 --
 * Gravity (bonus)
+----------
+
+2024-08-04(b)
+-------------
++ Further improve the files
++ Implemted generic force to bodies
+-------------
+
+2024-08-06
+----------
+* Gravity 
+* Better ship graphic (bonus)

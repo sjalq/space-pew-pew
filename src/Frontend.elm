@@ -8,8 +8,8 @@ import Html.Attributes as Attr
 import Json.Decode as Decode
 import Lamdera
 import Physics exposing (..)
+import RenderSvg exposing (renderGame)
 import Svg exposing (..)
-import Svg.Attributes as SvgAttr
 import Time
 import Types exposing (..)
 import Url
@@ -70,80 +70,72 @@ update msg model =
             ( model, Cmd.none )
 
         GameMsg gameMsg ->
-            model |> updateGame gameMsg
+            let
+                ( newGameState, cmd ) =
+                    model.gameState |> updateGame gameMsg
+
+                newModel =
+                    { model | gameState = newGameState }
+            in
+            ( newModel, cmd )
 
 
-updateGame : GameMsg -> Model -> ( Model, Cmd FrontendMsg )
-updateGame msg model =
+updateGame : GameMsg -> GameState -> ( GameState, Cmd FrontendMsg )
+updateGame msg gameState =
     case msg of
         FrameTick time ->
             --update the position of the ships and based on their velocity
             let
                 newShips =
-                    model.gameState.ships |> List.map (move model.gameState.space)
+                    gameState.ships |> List.map (move gameState.space)
 
                 newProjectiles =
-                    model.gameState.projectiles |> List.map (move model.gameState.space)
-
-                oldGameState =
-                    model.gameState
+                    gameState.projectiles |> List.map (move gameState.space)
 
                 newGameState =
-                    { oldGameState
+                    { gameState
                         | ships = newShips
                         , projectiles = newProjectiles
-                        , timeElapsed = oldGameState.timeElapsed + moment
+                        , timeElapsed = gameState.timeElapsed + moment
                     }
             in
-            ( { model | gameState = newGameState }, Cmd.none )
+            ( newGameState, Cmd.none )
 
         FireProjectile ->
-            ( model, Cmd.none )
+            ( gameState, Cmd.none )
 
         Rotate direction ->
-            case model.gameState.ships of
-                [firstShip, secondShip] ->
+            case gameState.ships of
+                [ firstShip, secondShip ] ->
                     let
                         newFirstShip =
                             rotate direction firstShip
 
-                        oldGameState =
-                            model.gameState
-
                         newGameState =
-                            { oldGameState | ships = [newFirstShip, secondShip] }
-
-                        newModel =
-                            { model | gameState = newGameState }
+                            { gameState | ships = [ newFirstShip, secondShip ] }
                     in
-                    ( newModel, Cmd.none )
+                    ( newGameState, Cmd.none )
 
                 _ ->
-                    ( model, Cmd.none )
+                    ( gameState, Cmd.none )
 
         Accelerate ->
-            case model.gameState.ships of
-                [firstShip, secondShip ] ->
+            case gameState.ships of
+                [ firstShip, secondShip ] ->
                     let
                         newFirstShip =
-                            thrust firstShip
-
-                        oldGameState =
-                            model.gameState
+                            rocket_thrust firstShip
 
                         newGameState =
-                            { oldGameState | ships = [newFirstShip, secondShip] }
-
-                        newModel =
-                            { model | gameState = newGameState }
+                            { gameState | ships = [ newFirstShip, secondShip ] }
                     in
-                    ( newModel, Cmd.none )
+                    ( newGameState, Cmd.none )
 
                 _ ->
-                    ( model, Cmd.none )
+                    ( gameState, Cmd.none )
 
         NoAction ->
-            ( model, Cmd.none )
+            ( gameState, Cmd.none )
 
 
 updateFromBackend : ToFrontend -> Model -> ( Model, Cmd FrontendMsg )
@@ -192,6 +184,7 @@ initState =
           , radius = 20
           , mass = 100
           , thrust = 1
+          , rotationSpeed = 0.5
           }
         , { position = { x = 700, y = 500 }
           , velocity = { x = 0, y = 0 }
@@ -202,6 +195,7 @@ initState =
           , radius = 20
           , mass = 100
           , thrust = 1
+          , rotationSpeed = 0.1
           }
         ]
     , projectiles = [] -- No projectiles (pew pew) as requested
@@ -213,105 +207,6 @@ initState =
     , timeElapsed = 0
     , space = { width = 800, height = 600 }
     }
-
-
-
--- Rendering function
-
-
-renderGame : GameState -> Html GameMsg
-renderGame gameState =
-    let
-        gameWidth =
-            800
-
-        gameHeight =
-            600
-    in
-    svg
-        [ SvgAttr.width (String.fromInt gameWidth)
-        , SvgAttr.height (String.fromInt gameHeight)
-        , SvgAttr.viewBox ("0 0 " ++ String.fromInt gameWidth ++ " " ++ String.fromInt gameHeight)
-        , SvgAttr.style "background-color: black" -- Add a black background to represent space
-        ]
-        [ renderPlanet gameState.planet
-        , renderShips gameState.ships
-        , renderProjectiles gameState.projectiles
-        ]
-
-
-renderPlanet : Planet -> Svg GameMsg
-renderPlanet planet =
-    circle
-        [ SvgAttr.cx (String.fromFloat planet.position.x)
-        , SvgAttr.cy (String.fromFloat planet.position.y)
-        , SvgAttr.r (String.fromFloat planet.radius)
-        , SvgAttr.fill "gray"
-        ]
-        []
-
-
-renderShips : List Ship -> Svg GameMsg
-renderShips ships =
-    g [] (List.map renderShip ships)
-
-
-renderShip : Ship -> Svg GameMsg
-renderShip ship =
-    let
-        shipSize =
-            20
-
-        shipPoints =
-            String.join " "
-                [ "10,0" -- nose (rotated right by 90 degrees)
-                , "-10,5" -- right corner (now bottom corner)
-                , "-10,-5" -- left corner (now top corner)
-                ]
-    in
-    g
-        [ SvgAttr.transform
-            ("translate("
-                ++ String.fromFloat ship.position.x
-                ++ ","
-                ++ String.fromFloat ship.position.y
-                ++ ") "
-                ++ "rotate("
-                ++ String.fromFloat (ship.rotation * 180 / pi)
-                ++ ")"
-            )
-        ]
-        [ polygon
-            [ SvgAttr.points shipPoints
-            , SvgAttr.fill (shipColorFromType ship.shipType)
-            , SvgAttr.stroke "white"
-            , SvgAttr.strokeWidth "1"
-            ]
-            []
-        ]
-
-
-shipColorFromType : ShipType -> String
-shipColorFromType shipType =
-    case shipType of
-        Triangle ->
-            "blue"
-
-
-renderProjectiles : List Projectile -> Svg GameMsg
-renderProjectiles projectiles =
-    g [] (List.map renderProjectile projectiles)
-
-
-renderProjectile : Projectile -> Svg GameMsg
-renderProjectile projectile =
-    circle
-        [ SvgAttr.cx (String.fromFloat projectile.position.x)
-        , SvgAttr.cy (String.fromFloat projectile.position.y)
-        , SvgAttr.r "2"
-        , SvgAttr.fill "yellow"
-        ]
-        []
 
 
 subscribeToKeyPresses : Sub FrontendMsg
