@@ -1,5 +1,6 @@
 module Physics exposing (..)
 
+import Dict exposing (Dict)
 import Types exposing (..)
 
 
@@ -46,6 +47,25 @@ dotProduct v1 v2 =
     v1.x * v2.x + v1.y * v2.y
 
 
+degreesToRadians : Float -> Float
+degreesToRadians degrees =
+    degrees * (pi / 180)
+
+
+combinations : List a -> List (List a)
+combinations list =
+    case list of
+        [] ->
+            []
+
+        x :: xs ->
+            (xs |> List.map (\y -> [ x, y ])) ++ combinations xs
+
+
+
+-- Physics
+
+
 wrapVectorToSpace : Space -> Vector2D -> Vector2D
 wrapVectorToSpace space vec =
     let
@@ -64,11 +84,7 @@ wrapVectorToSpace space vec =
     }
 
 
-
--- Physics
-
-
-move : Space -> Body a -> Body a
+move : Space -> Body -> Body
 move space body =
     let
         newPosition =
@@ -79,7 +95,7 @@ move space body =
     { body | position = newPosition }
 
 
-applyForce : Vector2D -> Body a -> Body a
+applyForce : Vector2D -> Body -> Body
 applyForce force body =
     let
         acceleration =
@@ -88,16 +104,7 @@ applyForce force body =
     { body | velocity = addV body.velocity acceleration }
 
 
-altApplyForce : Vector2D -> AltBody -> AltBody
-altApplyForce force body =
-    let
-        acceleration =
-            scaleV (1 / body.mass) force
-    in
-    { body | velocity = addV body.velocity acceleration }
-
-
-gravitationalForce : Body a -> Body a -> Vector2D
+gravitationalForce : Body -> Body -> Vector2D
 gravitationalForce bodyA bodyB =
     let
         distance =
@@ -109,7 +116,7 @@ gravitationalForce bodyA bodyB =
     angleBetween |> angleToV (bodyA.mass * bodyB.mass / distance ^ 2)
 
 
-centerOfMass : List (Body a) -> Vector2D
+centerOfMass : List Body -> Vector2D
 centerOfMass bodies =
     let
         totalMass =
@@ -128,22 +135,25 @@ centerOfMass bodies =
         { x = 0, y = 0 }
 
 
-rocket_thrust : Rocket a -> Rocket a
-rocket_thrust rocket =
-    rocket |> applyForce (angleToV rocket.thrust rocket.rotation)
-
-
-altRocket_thrust : AltBody -> AltBody
-altRocket_thrust body =
+ship_propel : Body -> Body
+ship_propel body =
     case body.bodyType of
-        AltShip ship ->
-            body |> altApplyForce (angleToV ship.thrust ship.rotation)
+        Ship ship ->
+            case ship.propulsion of
+                Newtonian { thrust } ->
+                    body |> applyForce (angleToV thrust ship.rotation)
+
+                Arilou { momentVelocity } ->
+                    { body
+                        | position = addV body.position (scaleV momentVelocity (angleToV 1 ship.rotation))
+                        , velocity = { x = 0, y = 0 }
+                    }
 
         _ ->
             body
 
 
-checkCollision : Body a -> Body a -> Bool
+checkCollision : Body -> Body -> Bool
 checkCollision bodyA bodyB =
     let
         distance =
@@ -152,21 +162,12 @@ checkCollision bodyA bodyB =
     distance <= bodyA.radius + bodyB.radius
 
 
-altCheckCollision : AltBody -> AltBody -> Bool
-altCheckCollision bodyA bodyB =
-    let
-        distance =
-            sqrt ((bodyA.position.x - bodyB.position.x) ^ 2 + (bodyA.position.y - bodyB.position.y) ^ 2)
-    in
-    distance <= bodyA.radius + bodyB.radius
-
-
-collide : AltBody -> AltBody -> ( AltBody, AltBody )
+collide : Body -> Body -> ( Bool, List Body )
 collide bodyA bodyB =
-    if (bodyA.id /= bodyB.id) && altCheckCollision bodyA bodyB then
+    if (bodyA.id /= bodyB.id) && checkCollision bodyA bodyB then
         let
             _ =
-                Debug.log "collide" ( bodyA.id, bodyB.id )
+                Debug.log "collision" ( bodyA.id, bodyB.id )
 
             normal =
                 Vector2D
@@ -199,77 +200,66 @@ collide bodyA bodyB =
             newVelocityB =
                 addV bodyB.velocity (scaleV (1 / bodyB.mass) impulse)
         in
-        ( { bodyA | velocity = newVelocityA }
-        , { bodyB | velocity = newVelocityB }
+        ( True
+        , [ { bodyA | velocity = newVelocityA }
+          , { bodyB | velocity = newVelocityB }
+          ]
         )
 
     else
-        ( bodyA, bodyB )
+        ( False, [ bodyA, bodyB ] )
 
 
-degreesToRadians : Float -> Float
-degreesToRadians degrees =
-    degrees * (pi / 180)
-
-
-rotate : Direction -> Rocket a -> Rocket a
-rotate direction rocket =
+performCollisions : Dict Int Body -> Dict Int Body
+performCollisions bodies =
     let
-        newRotation =
-            case direction of
-                Left ->
-                    rocket.rotation - rocket.rotationSpeed
+        ( collidingBodies, nonCollidingBodies ) =
+            bodies
+                |> Dict.values
+                |> combinations
+                |> List.map
+                    (\combo ->
+                        case combo of
+                            [ a, b ] ->
+                                collide a b
 
-                Right ->
-                    rocket.rotation + rocket.rotationSpeed
+                            _ ->
+                                ( False, [] )
+                    )
+                |> List.partition Tuple.first
+
+        nonCollidingBodies_ =
+            List.map Tuple.second nonCollidingBodies
+                |> List.concat
+                |> List.map (\b -> ( b.id, b ))
+                |> Dict.fromList
+
+        collidingBodies_ =
+            List.map Tuple.second collidingBodies
+                |> List.concat
+                |> List.map (\b -> ( b.id, b ))
+                |> Dict.fromList
+
+        result =
+            Dict.union collidingBodies_ nonCollidingBodies_
     in
-    { rocket | rotation = newRotation }
+    result
 
 
-altRotate : Direction -> AltBody -> AltBody
-altRotate direction body =
+rotate : Direction -> Body -> Body
+rotate direction body =
     let
         newBodyType =
             case body.bodyType of
-                AltShip ship ->
+                Ship ship ->
                     case direction of
                         Left ->
-                            AltShip { ship | rotation = ship.rotation - ship.rotationSpeed }
+                            Ship { ship | rotation = ship.rotation - ship.rotationSpeed }
 
                         Right ->
-                            AltShip { ship | rotation = ship.rotation + ship.rotationSpeed }
+                            Ship { ship | rotation = ship.rotation + ship.rotationSpeed }
 
                 _ ->
                     body.bodyType
     in
     { body | bodyType = newBodyType }
-
-
-isShip : AltBody -> Bool
-isShip body =
-    case body.bodyType of
-        AltShip _ ->
-            True
-
-        _ ->
-            False
-
-
-isPlanet : AltBody -> Bool
-isPlanet body =
-    case body.bodyType of
-        AltPlanet _ ->
-            True
-
-        _ ->
-            False
-
-
-isProjectile : AltBody -> Bool
-isProjectile body =
-    case body.bodyType of
-        AltProjectile _ ->
-            True
-
-        _ ->
-            False

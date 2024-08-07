@@ -2,13 +2,14 @@ module Types exposing (..)
 
 import Browser exposing (UrlRequest)
 import Browser.Navigation exposing (Key)
+import Dict exposing (Dict)
 import Time
 import Url exposing (Url)
 
 
 type alias FrontendModel =
     { key : Key
-    , gameState : AltGameState
+    , gameState : GameState
     }
 
 
@@ -20,7 +21,7 @@ type FrontendMsg
     = UrlClicked UrlRequest
     | UrlChanged Url
     | NoOpFrontendMsg
-    | GameMsg AltGameMsg
+    | GameMsg GameMsg
 
 
 type ToBackend
@@ -39,85 +40,42 @@ type ToFrontend
 -- alt physics types stating with body and defining more specific types
 
 
-type alias AltBody =
+type alias Body =
     { id : Int
     , mass : Float
     , position : Vector2D
     , velocity : Vector2D
     , radius : Float
-    , bodyType : BodyType
+    , bodyType : BodyType 
     }
 
 
 type BodyType
-    = AltPlanet { gravity : Float }
-    | AltShip { rotation : Float, thrust : Float, rotationSpeed : Float }
-    | AltProjectile { damage : Int, lifetime : Float }
+    = Planet { gravity : Float }
+    | Ship ShipData
+    | Projectile
+        { damage : Int
+        , lifetime : Float
+        }
+
+type alias ShipData =
+    { rotation : Float
+    , rotationSpeed : Float
+    , propulsion : PropulsionType
+    }
+
+
+type PropulsionType
+    = Newtonian { thrust : Float }
+    | Arilou { momentVelocity : Float }
 
 
 
 -- Game Types for Space Pew Pew!
 
 
-type alias Ship =
-    { position : Vector2D
-    , velocity : Vector2D
-    , rotation : Float
-    , crew : Int
-    , energy : Int
-    , shipType : ShipType
-    , radius : Float
-    , mass : Float
-    , thrust : Float -- the force of the ship's engines
-    , rotationSpeed : Float
-    }
-
-
 type ShipType
     = Triangle
-
-
-type alias Projectile =
-    { mass : Float
-    , position : Vector2D
-    , velocity : Vector2D
-    , radius : Float
-    , damage : Int
-    , lifetime : Float
-    }
-
-
-type alias Planet =
-    { position : Vector2D
-    , radius : Float
-    , gravity : Float
-    , mass : Float
-    }
-
-
-type alias Body a =
-    { a
-        | mass : Float
-        , position : Vector2D
-        , velocity : Vector2D
-        , radius : Float
-    }
-
-
-
--- type BodyType
---     = Planet { gravity : Float }
---     | Rocket { rotation : Float, thrust : Float }
---     | Projectile { damage : Int, lifetime : Float }
-
-
-type alias Rocket a =
-    Body
-        { a
-            | rotation : Float
-            , thrust : Float
-            , rotationSpeed : Float
-        }
 
 
 type alias Vector2D =
@@ -126,17 +84,8 @@ type alias Vector2D =
     }
 
 
-type alias AltGameState =
-    { bodies : List AltBody
-    , timeElapsed : Float
-    , space : Space
-    }
-
-
 type alias GameState =
-    { ships : List Ship
-    , projectiles : List Projectile
-    , planet : Planet
+    { bodies : Dict Int Body
     , timeElapsed : Float
     , space : Space
     }
@@ -153,20 +102,16 @@ type Direction
     | Right
 
 
-type alias Force =
-    Float
-
-
 
 -- Game Loop
 
 
-type AltGameMsg
+type GameMsg
     = NoAction
     | FrameTick Time.Posix
-    | FireProjectile
-    | Rotate Direction
-    | Accelerate
+    | FireProjectile Int
+    | Rotate Direction Int
+    | Propel Int
 
 
 moment : Float

@@ -1,7 +1,7 @@
 module RenderSvg exposing (..)
 
+import Dict exposing (Dict)
 import Html exposing (Html)
-import Physics exposing (isPlanet, isProjectile, isShip)
 import Svg exposing (..)
 import Svg.Attributes as SvgAttr
 import Types exposing (..)
@@ -11,7 +11,7 @@ import Types exposing (..)
 -- Rendering functions
 
 
-renderGame : AltGameState -> Html AltGameMsg
+renderGame : GameState -> Html GameMsg
 renderGame gameState =
     let
         gameWidth =
@@ -19,15 +19,6 @@ renderGame gameState =
 
         gameHeight =
             600
-
-        ships =
-            gameState.bodies |> List.filter isShip
-
-        planet =
-            gameState.bodies |> List.filter isPlanet |> List.head
-
-        projectiles =
-            gameState.bodies |> List.filter isProjectile
     in
     svg
         [ SvgAttr.width (String.fromInt gameWidth)
@@ -35,10 +26,26 @@ renderGame gameState =
         , SvgAttr.viewBox ("0 0 " ++ String.fromInt gameWidth ++ " " ++ String.fromInt gameHeight)
         , SvgAttr.style "background-color: black" -- Add a black background to represent space
         ]
-        [ Maybe.map renderPlanet planet |> Maybe.withDefault (g [] [])
-        , renderShips ships
-        , renderProjectiles projectiles
+        [ renderBodies gameState.bodies
         ]
+
+
+renderBodies : Dict Int Body -> Svg GameMsg
+renderBodies bodies =
+    g [] (bodies |> Dict.values |> List.map renderBody)
+
+
+renderBody : Body -> Svg GameMsg
+renderBody body =
+    case body.bodyType of
+        Planet _ ->
+            renderPlanet body
+
+        Ship _ ->
+            renderShipSvg body
+
+        Projectile _ ->
+            renderProjectile body
 
 
 
@@ -61,41 +68,6 @@ renderPlanet planet =
 
 renderShips ships =
     g [] (List.map renderShipSvg ships)
-
-
-renderShip : Ship -> Svg AltGameMsg
-renderShip ship =
-    let
-        shipSize =
-            20
-
-        shipPoints =
-            String.join " "
-                [ "10,0" -- nose (rotated right by 90 degrees)
-                , "-10,5" -- right corner (now bottom corner)
-                , "-10,-5" -- left corner (now top corner)
-                ]
-    in
-    g
-        [ SvgAttr.transform
-            ("translate("
-                ++ String.fromFloat ship.position.x
-                ++ ","
-                ++ String.fromFloat ship.position.y
-                ++ ") "
-                ++ "rotate("
-                ++ String.fromFloat (ship.rotation * 180 / pi)
-                ++ ")"
-            )
-        ]
-        [ polygon
-            [ SvgAttr.points shipPoints
-            , SvgAttr.fill (shipColorFromType ship.shipType)
-            , SvgAttr.stroke "white"
-            , SvgAttr.strokeWidth "1"
-            ]
-            []
-        ]
 
 
 shipColorFromType : ShipType -> String
@@ -135,7 +107,7 @@ renderShipSvg ship =
     let
         rotation =
             case ship.bodyType of
-                AltShip ship_ ->
+                Ship ship_ ->
                     ship_.rotation
 
                 _ ->

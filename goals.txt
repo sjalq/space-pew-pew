@@ -17,3 +17,9 @@
 + Collisions
 * Gravity 
 * Better ship graphic (bonus)
+
+2024-08-07
+----------
+* Logan mentioned to check out "space" around portals in Poral
+* Grok "appendable" better
+* Logan had objections to typing approach - Unsure why - Unsatisfied
