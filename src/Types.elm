@@ -46,23 +46,21 @@ type alias Body =
     , position : Vector2D
     , velocity : Vector2D
     , radius : Float
-    , bodyType : BodyType 
+    , bodyType : BodyType
     }
 
 
 type BodyType
     = Planet { gravity : Float }
-    | Ship ShipData
+    | Ship
+        { rotation : Float
+        , rotationSpeed : Float
+        , propulsion : PropulsionType
+        }
     | Projectile
         { damage : Int
         , lifetime : Float
         }
-
-type alias ShipData =
-    { rotation : Float
-    , rotationSpeed : Float
-    , propulsion : PropulsionType
-    }
 
 
 type PropulsionType
