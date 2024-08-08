@@ -24,6 +24,7 @@ import Evergreen.V1.Types
 import Evergreen.V2.Table
 import Evergreen.V2.Types
 import Lamdera.Migrations exposing (..)
+import Dict
 
 
 frontendModel : Evergreen.V1.Types.FrontendModel -> ModelMigration Evergreen.V2.Types.FrontendModel Evergreen.V2.Types.FrontendMsg
@@ -58,8 +59,8 @@ toFrontend old =
 
 migrate_Types_BackendModel : Evergreen.V1.Types.BackendModel -> Evergreen.V2.Types.BackendModel
 migrate_Types_BackendModel old =
-    { gameCount = (Unimplemented {- Type `Int` was added in V2. I need you to set a default value. -})
-    , pewsPewed = (Unimplemented {- Type `Int` was added in V2. I need you to set a default value. -})
+    { gameCount = 0
+    , pewsPewed = 0
     }
 
 
@@ -67,8 +68,8 @@ migrate_Types_FrontendModel : Evergreen.V1.Types.FrontendModel -> Evergreen.V2.T
 migrate_Types_FrontendModel old =
     { key = old.key
     , gameState = old.gameState |> migrate_Types_GameState
-    , gameCount = (Unimplemented {- Type `Int` was added in V2. I need you to set a default value. -})
-    , pewsPewed = (Unimplemented {- Type `Int` was added in V2. I need you to set a default value. -})
+    , gameCount = 0
+    , pewsPewed = 0
     }
 
 
@@ -151,30 +152,12 @@ migrate_Types_ToBackend old =
         Evergreen.V1.Types.NoOpToBackend ->
             Evergreen.V2.Types.NoOpToBackend
 
-        notices ->
-            {- @NOTICE `NewGameStarted` was added in V2.
-               This is just a reminder in case migrating some subset of the old data to this new value was important.
-               See https://lamdera.com/tips/modified-custom-type for more info.
-            -}
-            {- @NOTICE `PewPewed` was added in V2.
-               This is just a reminder in case migrating some subset of the old data to this new value was important.
-               See https://lamdera.com/tips/modified-custom-type for more info.
-            -}
-            (Unimplemented {- New constructors were added. I need you to resolve the above notices and then remove this case. -})
-
 
 migrate_Types_ToFrontend : Evergreen.V1.Types.ToFrontend -> Evergreen.V2.Types.ToFrontend
 migrate_Types_ToFrontend old =
     case old of
         Evergreen.V1.Types.NoOpToFrontend ->
             Evergreen.V2.Types.NoOpToFrontend
-
-        notices ->
-            {- @NOTICE `GlobalUpdate {}` was added in V2.
-               This is just a reminder in case migrating some subset of the old data to this new value was important.
-               See https://lamdera.com/tips/modified-custom-type for more info.
-            -}
-            (Unimplemented {- New constructors were added. I need you to resolve the above notices and then remove this case. -})
 
 
 migrate_Types_Vector2D : Evergreen.V1.Types.Vector2D -> Evergreen.V2.Types.Vector2D
