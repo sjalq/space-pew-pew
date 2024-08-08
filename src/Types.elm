@@ -22,6 +22,7 @@ type FrontendMsg
     | UrlChanged Url
     | NoOpFrontendMsg
     | GameMsg GameMsg
+    | NewGame
 
 
 type ToBackend
@@ -57,10 +58,22 @@ type BodyType
         { rotation : Float
         , rotationSpeed : Float
         , propulsion : PropulsionType
+        , projectile : ProjectileType
+        , crew : Int
         }
-    | Projectile
+    | Projectile ProjectileType
+
+
+type ProjectileType
+    = Kenetic
         { damage : Int
         , lifetime : Float
+        , initialSpeed : Float
+        , hit : Bool
+        }
+    | Photonic
+        { damage : Int
+        , range : Float
         }
 
 

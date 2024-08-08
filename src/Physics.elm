@@ -157,6 +157,37 @@ applyGravityToAll bodies =
     Table.map newBody bodies
 
 
+updateLifetimes : Table Body -> Table Body
+updateLifetimes bodies =
+    bodies
+        |> Table.filterMap updateLifetime
+
+
+updateLifetime : Body -> Maybe Body
+updateLifetime body =
+    -- if a body is projectile, this is relevant
+    -- if a projectile is Kenetic, this is relevant
+    case body.bodyType of
+        Projectile projectile ->
+            case projectile of
+                Kenetic rec ->
+                    if rec.lifetime < 0 then
+                        Nothing
+
+                    else
+                        Just
+                            { body
+                                | bodyType =
+                                    Projectile (Kenetic { rec | lifetime = rec.lifetime - moment })
+                            }
+
+                _ ->
+                    Just body
+
+        _ ->
+            Just body
+
+
 ship_propel : Body -> Body
 ship_propel body =
     case body.bodyType of
@@ -173,6 +204,57 @@ ship_propel body =
 
         _ ->
             body
+
+
+ship_fireProjectile : Body -> Maybe Body
+ship_fireProjectile body =
+    case body.bodyType of
+        Ship ship ->
+            let
+                projectile =
+                    case ship.projectile of
+                        Kenetic rec ->
+                            let
+                                initialVelocity =
+                                    angleToV rec.initialSpeed ship.rotation
+                                        |> addV body.velocity
+                            in
+                            { id = 0
+                            , radius = 2
+                            , position = addV body.position (angleToV body.radius ship.rotation)
+                            , velocity = addV body.velocity initialVelocity
+                            , mass = 1
+                            , bodyType =
+                                Projectile
+                                    (Kenetic
+                                        { rec
+                                            | damage = rec.damage
+                                            , initialSpeed = rec.initialSpeed
+                                            , lifetime = rec.lifetime
+                                        }
+                                    )
+                            }
+
+                        Photonic rec ->
+                            { id = 0
+                            , radius = 2
+                            , position = body.position
+                            , velocity = body.velocity
+                            , mass = 0
+                            , bodyType =
+                                Projectile
+                                    (Photonic
+                                        { rec
+                                            | damage = rec.damage
+                                            , range = rec.range
+                                        }
+                                    )
+                            }
+            in
+            Just projectile
+
+        _ ->
+            Nothing
 
 
 checkCollision : Body -> Body -> Bool
@@ -258,6 +340,23 @@ collide bodyA bodyB =
         ( False, [ bodyA, bodyB ] )
 
 
+interact : Body -> Body -> List Body
+interact bodyA bodyB =
+    case ( bodyA.bodyType, bodyB.bodyType ) of
+        ( Projectile (Kenetic rec), Ship ship ) ->
+            [ { bodyA | bodyType = Projectile (Kenetic { rec | hit = True }) }
+            , { bodyB | bodyType = Ship { ship | crew = ship.crew - rec.damage } }
+            ]
+
+        ( Ship ship, Projectile (Kenetic rec) ) ->
+            [ { bodyA | bodyType = Ship { ship | crew = ship.crew - rec.damage } }
+            , { bodyB | bodyType = Projectile (Kenetic { rec | hit = True }) }
+            ]
+
+        _ ->
+            [ bodyA, bodyB ]
+
+
 performCollisions : Table Body -> Table Body
 performCollisions bodies =
     let
@@ -269,7 +368,19 @@ performCollisions bodies =
                     (\combo ->
                         case combo of
                             [ a, b ] ->
-                                collide a b
+                                let
+                                    ( collided, newBodies ) =
+                                        collide a b
+
+                                    newBodies_ =
+                                        case ( collided, newBodies ) of
+                                            ( True, [ a_, b_ ] ) ->
+                                                interact a_ b_
+
+                                            _ ->
+                                                newBodies
+                                in
+                                ( collided, newBodies_ )
 
                             _ ->
                                 ( False, [] )
@@ -290,6 +401,26 @@ performCollisions bodies =
             Table.union collidingBodies_ nonCollidingBodies_
     in
     result
+
+
+projectile_destroyed : Body -> Bool
+projectile_destroyed body =
+    case body.bodyType of
+        Projectile (Kenetic rec) ->
+            rec.hit
+
+        _ ->
+            False
+
+
+ship_destroyed : Body -> Bool
+ship_destroyed body =
+    case body.bodyType of
+        Ship ship ->
+            ship.crew <= 0
+
+        _ ->
+            False
 
 
 rotate : Direction -> Body -> Body

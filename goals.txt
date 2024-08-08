@@ -23,3 +23,12 @@
 * Logan mentioned to check out "space" around portals in Poral
 * Grok "appendable" better
 * Logan had objections to typing approach - Unsure why - Unsatisfied
+
+2024-08-08
+----------
+* Make projectiles
+----------
+* Make planet a beautiful gas giant
+* Make ships high res top view
+* Arilou
+* Human

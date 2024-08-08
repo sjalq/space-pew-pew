@@ -27,6 +27,24 @@ map fn (Table nextId_ table) =
     Table nextId_ (Dict.map (\_ value -> fn value) table)
 
 
+filter : (a -> Bool) -> Table a -> Table a
+filter fn (Table nextId_ table) =
+    Table nextId_ (Dict.filter (\_ value -> fn value) table)
+
+
+filterMap fn (Table nextId_ table) =
+    let
+        newDict =
+            table
+                |> Dict.values
+                |> List.filterMap fn
+                |> List.map (\v -> ( v.id, v ))
+                |> Dict.fromList
+    in
+    Table nextId_ newDict
+
+
+
 insert : { a | id : Int } -> Table { a | id : Int } -> Table { a | id : Int }
 insert record (Table id dict) =
     let
