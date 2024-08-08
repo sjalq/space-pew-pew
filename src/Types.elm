@@ -10,11 +10,15 @@ import Url exposing (Url)
 type alias FrontendModel =
     { key : Key
     , gameState : GameState
+    , gameCount : Int
+    , pewsPewed : Int
     }
 
 
 type alias BackendModel =
-    {}
+    { gameCount : Int
+    , pewsPewed : Int
+    }
 
 
 type FrontendMsg
@@ -27,6 +31,8 @@ type FrontendMsg
 
 type ToBackend
     = NoOpToBackend
+    | NewGameStarted
+    | PewPewed
 
 
 type BackendMsg
@@ -35,6 +41,7 @@ type BackendMsg
 
 type ToFrontend
     = NoOpToFrontend
+    | GlobalUpdate { gameCount : Int, pewsPewed : Int }
 
 
 

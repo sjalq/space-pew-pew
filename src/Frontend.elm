@@ -15,7 +15,7 @@ import Table exposing (insertMaybe)
 import Time
 import Types exposing (..)
 import Url
-
+import L
 
 type alias Model =
     FrontendModel
@@ -45,8 +45,10 @@ init : Url.Url -> Nav.Key -> ( Model, Cmd FrontendMsg )
 init url key =
     ( { key = key
       , gameState = initState
+      , gameCount = 0
+      , pewsPewed = 0
       }
-    , Cmd.none
+    , L.sendToBackend NewGameStarted
     )
 
 
@@ -82,7 +84,7 @@ update msg model =
             ( newModel, cmd )
 
         NewGame ->
-            ( { model | gameState = initState }, Cmd.none )
+            ( { model | gameState = initState }, L.sendToBackend NewGameStarted )
 
 
 updateGame : GameMsg -> GameState -> ( GameState, Cmd FrontendMsg )
@@ -127,7 +129,7 @@ updateGame msg gameState =
                 newState =
                     { gameState | bodies = newBodies }
             in
-            ( newState, Cmd.none )
+            ( newState, L.sendToBackend PewPewed )
 
         Rotate direction bodyId ->
             let
@@ -168,6 +170,9 @@ updateFromBackend msg model =
     case msg of
         NoOpToFrontend ->
             ( model, Cmd.none )
+        
+        GlobalUpdate global ->
+            ( { model | gameCount = global.gameCount, pewsPewed = global.pewsPewed }, Cmd.none )
 
 
 view : Model -> Browser.Document FrontendMsg
@@ -195,6 +200,11 @@ view model =
                 , Html.Events.onClick NewGame
                 ]
                 [ Html.text "New Game" ]
+            , Html.div []
+                [ Html.text ("Game Count: " ++ String.fromInt model.gameCount)
+                , Html.br [] []
+                , Html.text ("Pews Pewed: " ++ String.fromInt model.pewsPewed)
+                ]
             ]
         ]
     }

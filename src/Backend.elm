@@ -2,7 +2,7 @@ module Backend exposing (..)
 
 import Lamdera exposing (ClientId, SessionId)
 import Types exposing (..)
-
+import L
 
 type alias Model =
     BackendModel
@@ -19,7 +19,7 @@ app =
 
 init : ( Model, Cmd BackendMsg )
 init =
-    ( {}
+    ( { gameCount = 0, pewsPewed = 0 }
     , Cmd.none
     )
 
@@ -36,3 +36,17 @@ updateFromFrontend sessionId clientId msg model =
     case msg of
         NoOpToBackend ->
             ( model, Cmd.none )
+
+        NewGameStarted ->
+            let
+                newModel = { model | gameCount = model.gameCount + 1 }
+            in
+            
+            ( newModel, L.broadcast (GlobalUpdate { gameCount = newModel.gameCount, pewsPewed = newModel.pewsPewed }) )   
+
+        PewPewed -> 
+            let
+                newModel = { model | pewsPewed = model.pewsPewed + 1 }
+            in
+            ( newModel, L.broadcast (GlobalUpdate { gameCount = newModel.gameCount, pewsPewed = newModel.pewsPewed }) )
+    
