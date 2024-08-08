@@ -233,14 +233,20 @@ collide bodyA bodyB =
             overlapDistance =
                 (bodyA.radius + bodyB.radius) - distance_
 
-            correctionVector =
-                scaleV (overlapDistance / 2) normal
+            totalMass =
+                bodyA.mass + bodyB.mass
+
+            correctionVectorA =
+                scaleV (overlapDistance * (bodyB.mass / totalMass)) normal
+
+            correctionVectorB =
+                scaleV (overlapDistance * (bodyA.mass / totalMass)) normal
 
             correctedPositionA =
-                subV bodyA.position correctionVector
+                subV bodyA.position correctionVectorA
 
             correctedPositionB =
-                addV bodyB.position correctionVector
+                addV bodyB.position correctionVectorB
         in
         ( True
         , [ { bodyA | position = correctedPositionA, velocity = newVelocityA }
