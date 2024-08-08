@@ -3,16 +3,14 @@ module Frontend exposing (..)
 import Browser exposing (UrlRequest(..))
 import Browser.Events
 import Browser.Navigation as Nav
-import Dict
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Json.Decode as Decode
 import Lamdera
-import List.Extra
 import Physics exposing (..)
 import RenderSvg exposing (renderGame)
-import Structures exposing (insertMaybe)
 import Svg exposing (..)
+import Table exposing (insertMaybe)
 import Time
 import Types exposing (..)
 import Url
@@ -89,7 +87,9 @@ updateGame msg gameState =
         FrameTick time ->
             let
                 newBodies =
-                    gameState.bodies |> Dict.map (\_ body -> move gameState.space body)
+                    gameState.bodies
+                        |> applyGravityToAll
+                        |> Table.map (\body -> move gameState.space body)
 
                 finalBodies =
                     performCollisions newBodies
@@ -109,7 +109,7 @@ updateGame msg gameState =
             let
                 ship =
                     gameState.bodies
-                        |> Dict.get bodyId
+                        |> Table.get bodyId
                         |> Maybe.map (rotate direction)
             in
             ( { gameState
@@ -124,13 +124,13 @@ updateGame msg gameState =
             let
                 bodyToAccelerate =
                     gameState.bodies
-                        |> Dict.get bodyId
+                        |> Table.get bodyId
                         |> Maybe.map ship_propel
             in
             ( { gameState
                 | bodies =
                     gameState.bodies
-                        |> insertMaybe bodyToAccelerate
+                        |> Table.insertMaybe bodyToAccelerate
               }
             , Cmd.none
             )
@@ -177,17 +177,17 @@ initState : GameState
 initState =
     { bodies =
         [ { id = 1
-          , mass = 1000
+          , mass = 100000000000
           , position = { x = 400, y = 300 }
           , velocity = { x = 0, y = 0 }
-          , radius = 20
+          , radius = 50
           , bodyType = Planet { gravity = 9.8 }
           }
         , { id = 2
           , mass = 50
           , position = { x = 100, y = 100 }
           , velocity = { x = 0, y = 0 }
-          , radius = 100
+          , radius = 50
           , bodyType =
                 Ship
                     { rotation = 0
@@ -199,11 +199,11 @@ initState =
           , mass = 50
           , position = { x = 700, y = 500 }
           , velocity = { x = 0, y = 0 }
-          , radius = 100
+          , radius = 50
           , bodyType =
                 Ship
                     { rotation = 0
-                    , propulsion = Arilou { momentVelocity = 1 }
+                    , propulsion = LittleGrayMenTech { movementIncrement = 1 }
                     , rotationSpeed = 0.1
                     }
           }
@@ -216,10 +216,9 @@ initState =
         --   , bodyType = AltProjectile { damage = 5, lifetime = 10 }
         --   }
         ]
-            |> List.map (\b -> ( b.id, b ))
-            |> Dict.fromList
+            |> Table.fromList
     , timeElapsed = 0
-    , space = { width = 800, height = 600 }
+    , space = { width = 1000, height = 800 }
     }
 
 
@@ -265,39 +264,3 @@ keyPressed key =
                     Debug.log "keyPressed" key
             in
             NoAction
-
-
-altPerformCollisions : List Body -> List Body
-altPerformCollisions bodies =
-    let
-        ( collidingBodies, nonCollidingBodies ) =
-            bodies
-                |> Physics.combinations
-                |> List.map
-                    (\combo ->
-                        case combo of
-                            [ a, b ] ->
-                                Physics.collide a b
-
-                            _ ->
-                                ( False, [] )
-                    )
-                |> List.partition Tuple.first
-
-        nonCollidingBodies_ =
-            List.map Tuple.second nonCollidingBodies
-                |> List.concat
-                |> List.map (\b -> ( b.id, b ))
-                |> Dict.fromList
-
-        collidingBodies_ =
-            List.map Tuple.second collidingBodies
-                |> List.concat
-                |> List.map (\b -> ( b.id, b ))
-                |> Dict.fromList
-
-        result =
-            Dict.union collidingBodies_ nonCollidingBodies_
-                |> Dict.values
-    in
-    result

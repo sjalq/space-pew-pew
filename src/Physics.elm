@@ -1,6 +1,6 @@
 module Physics exposing (..)
 
-import Dict exposing (Dict)
+import Table exposing (Table)
 import Types exposing (..)
 
 
@@ -12,6 +12,13 @@ addV : Vector2D -> Vector2D -> Vector2D
 addV v1 v2 =
     { x = v1.x + v2.x
     , y = v1.y + v2.y
+    }
+
+
+subV : Vector2D -> Vector2D -> Vector2D
+subV v1 v2 =
+    { x = v1.x - v2.x
+    , y = v1.y - v2.y
     }
 
 
@@ -40,6 +47,11 @@ normalizeV vec =
 
     else
         vec
+
+
+magnitudeV : Vector2D -> Float
+magnitudeV vec =
+    sqrt (vec.x ^ 2 + vec.y ^ 2)
 
 
 dotProduct : Vector2D -> Vector2D -> Float
@@ -104,35 +116,45 @@ applyForce force body =
     { body | velocity = addV body.velocity acceleration }
 
 
+gravitationalConstant : Float
+gravitationalConstant =
+    6.6743e-11
+
+
 gravitationalForce : Body -> Body -> Vector2D
 gravitationalForce bodyA bodyB =
     let
-        distance =
-            sqrt ((bodyA.position.x - bodyB.position.x) ^ 2 + (bodyB.position.y - bodyA.position.y) ^ 2)
+        distanceVector =
+            subV bodyB.position bodyA.position
 
-        angleBetween =
-            atan2 (bodyB.position.y - bodyA.position.y) (bodyB.position.x - bodyA.position.x)
+        distance_ =
+            magnitudeV distanceVector
+                |> Debug.log "distance__"
+
+        forceMagnitude =
+            if distance_ == 0 then
+                0
+
+            else
+                (gravitationalConstant * bodyA.mass * bodyB.mass) / (distance_ ^ 2)
     in
-    angleBetween |> angleToV (bodyA.mass * bodyB.mass / distance ^ 2)
+    scaleV forceMagnitude (normalizeV distanceVector)
 
 
-centerOfMass : List Body -> Vector2D
-centerOfMass bodies =
+applyGravityToAll : Table Body -> Table Body
+applyGravityToAll bodies =
     let
-        totalMass =
-            List.foldl (\body acc -> acc + body.mass) 0 bodies
+        forceOnBody body =
+            bodies
+                |> Table.remove body.id
+                |> Table.toList
+                |> List.map (gravitationalForce body)
+                |> List.foldl addV { x = 0, y = 0 }
 
-        weightedPositions =
-            List.map (\body -> scaleV body.mass body.position) bodies
-
-        sumPositions =
-            List.foldl addV { x = 0, y = 0 } weightedPositions
+        newBody body =
+            body |> applyForce (forceOnBody body) |> Debug.log "newBody__"
     in
-    if totalMass > 0 then
-        scaleV (1 / totalMass) sumPositions
-
-    else
-        { x = 0, y = 0 }
+    Table.map newBody bodies
 
 
 ship_propel : Body -> Body
@@ -143,9 +165,9 @@ ship_propel body =
                 Newtonian { thrust } ->
                     body |> applyForce (angleToV thrust ship.rotation)
 
-                Arilou { momentVelocity } ->
+                LittleGrayMenTech { movementIncrement } ->
                     { body
-                        | position = addV body.position (scaleV momentVelocity (angleToV 1 ship.rotation))
+                        | position = addV body.position (scaleV movementIncrement (angleToV 1 ship.rotation))
                         , velocity = { x = 0, y = 0 }
                     }
 
@@ -155,16 +177,24 @@ ship_propel body =
 
 checkCollision : Body -> Body -> Bool
 checkCollision bodyA bodyB =
-    let
-        distance =
-            sqrt ((bodyA.position.x - bodyB.position.x) ^ 2 + (bodyA.position.y - bodyB.position.y) ^ 2)
-    in
-    distance <= bodyA.radius + bodyB.radius
+    distance bodyA.position bodyB.position <= bodyA.radius + bodyB.radius
+
+
+distance : Vector2D -> Vector2D -> Float
+distance v1 v2 =
+    sqrt ((v1.x - v2.x) ^ 2 + (v1.y - v2.y) ^ 2)
 
 
 collide : Body -> Body -> ( Bool, List Body )
 collide bodyA bodyB =
-    if (bodyA.id /= bodyB.id) && checkCollision bodyA bodyB then
+    let
+        distance_ =
+            distance bodyA.position bodyB.position
+
+        collision =
+            (bodyA.id /= bodyB.id) && checkCollision bodyA bodyB
+    in
+    if collision then
         let
             _ =
                 Debug.log "collision" ( bodyA.id, bodyB.id )
@@ -199,10 +229,22 @@ collide bodyA bodyB =
 
             newVelocityB =
                 addV bodyB.velocity (scaleV (1 / bodyB.mass) impulse)
+
+            overlapDistance =
+                (bodyA.radius + bodyB.radius) - distance_
+
+            correctionVector =
+                scaleV (overlapDistance / 2) normal
+
+            correctedPositionA =
+                subV bodyA.position correctionVector
+
+            correctedPositionB =
+                addV bodyB.position correctionVector
         in
         ( True
-        , [ { bodyA | velocity = newVelocityA }
-          , { bodyB | velocity = newVelocityB }
+        , [ { bodyA | position = correctedPositionA, velocity = newVelocityA }
+          , { bodyB | position = correctedPositionB, velocity = newVelocityB }
           ]
         )
 
@@ -210,12 +252,12 @@ collide bodyA bodyB =
         ( False, [ bodyA, bodyB ] )
 
 
-performCollisions : Dict Int Body -> Dict Int Body
+performCollisions : Table Body -> Table Body
 performCollisions bodies =
     let
         ( collidingBodies, nonCollidingBodies ) =
             bodies
-                |> Dict.values
+                |> Table.values
                 |> combinations
                 |> List.map
                     (\combo ->
@@ -231,17 +273,15 @@ performCollisions bodies =
         nonCollidingBodies_ =
             List.map Tuple.second nonCollidingBodies
                 |> List.concat
-                |> List.map (\b -> ( b.id, b ))
-                |> Dict.fromList
+                |> Table.fromList
 
         collidingBodies_ =
             List.map Tuple.second collidingBodies
                 |> List.concat
-                |> List.map (\b -> ( b.id, b ))
-                |> Dict.fromList
+                |> Table.fromList
 
         result =
-            Dict.union collidingBodies_ nonCollidingBodies_
+            Table.union collidingBodies_ nonCollidingBodies_
     in
     result
 

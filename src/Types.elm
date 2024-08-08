@@ -2,7 +2,7 @@ module Types exposing (..)
 
 import Browser exposing (UrlRequest)
 import Browser.Navigation exposing (Key)
-import Dict exposing (Dict)
+import Table exposing (Table)
 import Time
 import Url exposing (Url)
 
@@ -51,7 +51,8 @@ type alias Body =
 
 
 type BodyType
-    = Planet { gravity : Float }
+    = Conceptual
+    | Planet { gravity : Float }
     | Ship
         { rotation : Float
         , rotationSpeed : Float
@@ -65,15 +66,7 @@ type BodyType
 
 type PropulsionType
     = Newtonian { thrust : Float }
-    | Arilou { momentVelocity : Float }
-
-
-
--- Game Types for Space Pew Pew!
-
-
-type ShipType
-    = Triangle
+    | LittleGrayMenTech { movementIncrement : Float }
 
 
 type alias Vector2D =
@@ -83,7 +76,7 @@ type alias Vector2D =
 
 
 type alias GameState =
-    { bodies : Dict Int Body
+    { bodies : Table Body
     , timeElapsed : Float
     , space : Space
     }
@@ -114,4 +107,4 @@ type GameMsg
 
 moment : Float
 moment =
-    1000 / 24
+    1000 / 60

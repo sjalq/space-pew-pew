@@ -1,9 +1,9 @@
 module RenderSvg exposing (..)
 
-import Dict exposing (Dict)
 import Html exposing (Html)
 import Svg exposing (..)
 import Svg.Attributes as SvgAttr
+import Table exposing (Table)
 import Types exposing (..)
 
 
@@ -15,10 +15,10 @@ renderGame : GameState -> Html GameMsg
 renderGame gameState =
     let
         gameWidth =
-            800
+            gameState.space.width |> round
 
         gameHeight =
-            600
+            gameState.space.height |> round
     in
     svg
         [ SvgAttr.width (String.fromInt gameWidth)
@@ -30,9 +30,9 @@ renderGame gameState =
         ]
 
 
-renderBodies : Dict Int Body -> Svg GameMsg
+renderBodies : Table Body -> Svg GameMsg
 renderBodies bodies =
-    g [] (bodies |> Dict.values |> List.map renderBody)
+    g [] (bodies |> Table.toList |> List.map renderBody)
 
 
 renderBody : Body -> Svg GameMsg
@@ -46,6 +46,9 @@ renderBody body =
 
         Projectile _ ->
             renderProjectile body
+
+        _ ->
+            text ""
 
 
 
@@ -68,13 +71,6 @@ renderPlanet planet =
 
 renderShips ships =
     g [] (List.map renderShipSvg ships)
-
-
-shipColorFromType : ShipType -> String
-shipColorFromType shipType =
-    case shipType of
-        Triangle ->
-            "blue"
 
 
 
