@@ -99,6 +99,7 @@ type alias GameState =
     { bodies : Table Body
     , timeElapsed : Float
     , space : Space
+    , entropyCount : Int
     }
 
 

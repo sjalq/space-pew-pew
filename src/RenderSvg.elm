@@ -1,11 +1,12 @@
 module RenderSvg exposing (..)
 
 import Html exposing (Html)
+import Sha256 exposing (sha256)
 import Svg exposing (..)
 import Svg.Attributes as SvgAttr
 import Table exposing (Table)
 import Types exposing (..)
-import Sha256 exposing (sha256)
+
 
 
 -- Rendering functions
@@ -30,12 +31,10 @@ renderGame gameState =
         ]
 
 
-renderBodies : Table Body -> Svg GameMsg
 renderBodies bodies =
     g [] (bodies |> Table.toList |> List.map renderBody)
 
 
-renderBody : Body -> Svg GameMsg
 renderBody body =
     case body.bodyType of
         Planet _ ->
@@ -77,36 +76,80 @@ renderPlanet planet =
             []
         , -- Bands
           path
-            [ SvgAttr.d ("M" ++ String.fromFloat (planet.position.x - planet.radius * 0.9) ++ " " ++ String.fromFloat planet.position.y ++ 
-                         " Q " ++ String.fromFloat planet.position.x ++ " " ++ String.fromFloat (planet.position.y - planet.radius * 0.3) ++ 
-                         " " ++ String.fromFloat (planet.position.x + planet.radius * 0.9) ++ " " ++ String.fromFloat planet.position.y)
+            [ SvgAttr.d
+                ("M"
+                    ++ String.fromFloat (planet.position.x - planet.radius * 0.9)
+                    ++ " "
+                    ++ String.fromFloat planet.position.y
+                    ++ " Q "
+                    ++ String.fromFloat planet.position.x
+                    ++ " "
+                    ++ String.fromFloat (planet.position.y - planet.radius * 0.3)
+                    ++ " "
+                    ++ String.fromFloat (planet.position.x + planet.radius * 0.9)
+                    ++ " "
+                    ++ String.fromFloat planet.position.y
+                )
             , SvgAttr.fill "none"
             , SvgAttr.stroke "#D39553"
             , SvgAttr.strokeWidth (String.fromFloat (planet.radius * 0.1))
             ]
             []
         , path
-            [ SvgAttr.d ("M" ++ String.fromFloat (planet.position.x - planet.radius * 0.9) ++ " " ++ String.fromFloat (planet.position.y + planet.radius * 0.2) ++ 
-                         " Q " ++ String.fromFloat planet.position.x ++ " " ++ String.fromFloat (planet.position.y + planet.radius * 0.5) ++ 
-                         " " ++ String.fromFloat (planet.position.x + planet.radius * 0.9) ++ " " ++ String.fromFloat (planet.position.y + planet.radius * 0.2))
+            [ SvgAttr.d
+                ("M"
+                    ++ String.fromFloat (planet.position.x - planet.radius * 0.9)
+                    ++ " "
+                    ++ String.fromFloat (planet.position.y + planet.radius * 0.2)
+                    ++ " Q "
+                    ++ String.fromFloat planet.position.x
+                    ++ " "
+                    ++ String.fromFloat (planet.position.y + planet.radius * 0.5)
+                    ++ " "
+                    ++ String.fromFloat (planet.position.x + planet.radius * 0.9)
+                    ++ " "
+                    ++ String.fromFloat (planet.position.y + planet.radius * 0.2)
+                )
             , SvgAttr.fill "none"
             , SvgAttr.stroke "#C17F3E"
             , SvgAttr.strokeWidth (String.fromFloat (planet.radius * 0.12))
             ]
             []
         , path
-            [ SvgAttr.d ("M" ++ String.fromFloat (planet.position.x - planet.radius * 0.9) ++ " " ++ String.fromFloat (planet.position.y - planet.radius * 0.2) ++ 
-                         " Q " ++ String.fromFloat planet.position.x ++ " " ++ String.fromFloat (planet.position.y - planet.radius * 0.4) ++ 
-                         " " ++ String.fromFloat (planet.position.x + planet.radius * 0.9) ++ " " ++ String.fromFloat (planet.position.y - planet.radius * 0.2))
+            [ SvgAttr.d
+                ("M"
+                    ++ String.fromFloat (planet.position.x - planet.radius * 0.9)
+                    ++ " "
+                    ++ String.fromFloat (planet.position.y - planet.radius * 0.2)
+                    ++ " Q "
+                    ++ String.fromFloat planet.position.x
+                    ++ " "
+                    ++ String.fromFloat (planet.position.y - planet.radius * 0.4)
+                    ++ " "
+                    ++ String.fromFloat (planet.position.x + planet.radius * 0.9)
+                    ++ " "
+                    ++ String.fromFloat (planet.position.y - planet.radius * 0.2)
+                )
             , SvgAttr.fill "none"
             , SvgAttr.stroke "#E8B77D"
             , SvgAttr.strokeWidth (String.fromFloat (planet.radius * 0.08))
             ]
             []
         , path
-            [ SvgAttr.d ("M" ++ String.fromFloat (planet.position.x - planet.radius * 0.9) ++ " " ++ String.fromFloat (planet.position.y + planet.radius * 0.4) ++ 
-                         " Q " ++ String.fromFloat planet.position.x ++ " " ++ String.fromFloat (planet.position.y + planet.radius * 0.3) ++ 
-                         " " ++ String.fromFloat (planet.position.x + planet.radius * 0.9) ++ " " ++ String.fromFloat (planet.position.y + planet.radius * 0.4))
+            [ SvgAttr.d
+                ("M"
+                    ++ String.fromFloat (planet.position.x - planet.radius * 0.9)
+                    ++ " "
+                    ++ String.fromFloat (planet.position.y + planet.radius * 0.4)
+                    ++ " Q "
+                    ++ String.fromFloat planet.position.x
+                    ++ " "
+                    ++ String.fromFloat (planet.position.y + planet.radius * 0.3)
+                    ++ " "
+                    ++ String.fromFloat (planet.position.x + planet.radius * 0.9)
+                    ++ " "
+                    ++ String.fromFloat (planet.position.y + planet.radius * 0.4)
+                )
             , SvgAttr.fill "none"
             , SvgAttr.stroke "#A66A2E"
             , SvgAttr.strokeWidth (String.fromFloat (planet.radius * 0.06))
@@ -145,7 +188,6 @@ renderProjectile projectile =
         []
 
 
-
 hashToColor : Int -> String
 hashToColor id =
     let
@@ -155,11 +197,17 @@ hashToColor id =
                 |> sha256
                 |> String.left 6
 
-        r = String.slice 0 2 hash
-        g = String.slice 2 4 hash
-        b = String.slice 4 6 hash
+        r =
+            String.slice 0 2 hash
+
+        g =
+            String.slice 2 4 hash
+
+        b =
+            String.slice 4 6 hash
     in
     "#" ++ r ++ g ++ b
+
 
 renderShipSvg ship =
     let
@@ -171,8 +219,11 @@ renderShipSvg ship =
                 _ ->
                     0
 
-        wingColor = hashToColor ship.id
-        bodyColor = hashToColor (ship.id + 1)
+        wingColor =
+            hashToColor ship.id
+
+        bodyColor =
+            hashToColor ship.id
     in
     g
         [ SvgAttr.transform
