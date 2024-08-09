@@ -20,6 +20,9 @@ renderGame gameState =
 
         gameHeight =
             gameState.space.height |> round
+
+        ( ship1, ship2 ) =
+            getFirstTwoShips gameState.bodies
     in
     svg
         [ SvgAttr.width (String.fromInt gameWidth)
@@ -27,8 +30,30 @@ renderGame gameState =
         , SvgAttr.viewBox ("0 0 " ++ String.fromInt gameWidth ++ " " ++ String.fromInt gameHeight)
         , SvgAttr.style "background-color: black" -- Add a black background to represent space
         ]
-        [ renderBodies gameState.bodies
+        [ ship1 |> Maybe.map (drawCrewHealthBar { x = 10, y = (toFloat gameHeight / 2) - 25 }) |> Maybe.withDefault (text "")
+        , ship2 |> Maybe.map (drawCrewHealthBar { x = (toFloat gameWidth - 54), y = (toFloat gameHeight / 2) - 25 }) |> Maybe.withDefault (text "")
+        , gameState.bodies |> renderBodies
         ]
+
+
+body_isShip : Body -> Bool
+body_isShip body =
+    case body.bodyType of
+        Ship _ ->
+            True
+
+        _ ->
+            False
+
+
+getFirstTwoShips : Table Body -> ( Maybe Body, Maybe Body )
+getFirstTwoShips bodies =
+    case bodies |> Table.filter body_isShip |> Table.toList of
+        [ ship1, ship2 ] ->
+            ( Just ship1, Just ship2 )
+
+        _ ->
+            ( Nothing, Nothing )
 
 
 renderBodies bodies =
@@ -379,3 +404,62 @@ renderHumanShip ship =
             ]
             []
         ]
+
+
+drawCrewHealthBar : Vector2D -> Body -> Svg GameMsg
+drawCrewHealthBar position ship =
+    case ship.bodyType of
+        Ship ship_ ->
+            let
+                drawGreenBlock index =
+                    rect
+                        [ SvgAttr.width (String.fromFloat blockWidth)
+                        , SvgAttr.height (String.fromFloat blockHeight)
+                        , SvgAttr.x "0"
+                        , SvgAttr.y (String.fromFloat (toFloat index * blockHeight))
+                        , SvgAttr.fill "#00FF00"
+                        , SvgAttr.stroke "#008000"
+                        , SvgAttr.strokeWidth "1"
+                        ]
+                        []
+
+                blockWidth =
+                    20
+
+                blockHeight =
+                    5
+
+                rows =
+                    ship_.maxCrew // 2
+
+                leftColumnCount =
+                    ship_.crew // 2
+
+                rightColumnCount =
+                    ship_.crew - leftColumnCount
+
+                leftBlocks =
+                    List.range -(leftColumnCount - 1) 0 |> List.map drawGreenBlock
+
+                rightBlocks =
+                    List.range -(rightColumnCount - 1) 0 |> List.map drawGreenBlock
+
+                drawColumn x blocks =
+                    g [ SvgAttr.transform ("translate(" ++ String.fromFloat x ++ ", 0)") ]
+                        (List.indexedMap (\i block -> g [ SvgAttr.transform ("translate(0, " ++ String.fromFloat (toFloat i * (blockHeight + 2)) ++ ")") ] [ block ]) blocks)
+            in
+            g
+                [ SvgAttr.transform
+                    ("translate("
+                        ++ String.fromFloat (position.x)
+                        ++ ","
+                        ++ String.fromFloat (position.y)
+                        ++ ")"
+                    )
+                ]
+                [ drawColumn 0 leftBlocks
+                , drawColumn (blockWidth + 4) rightBlocks
+                ]
+
+        _ ->
+            g [] []

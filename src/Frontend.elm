@@ -272,6 +272,7 @@ initState gameCount =
                     , propulsion = Newtonian { thrust = 1 }
                     , rotationSpeed = 0.1
                     , projectile = Kenetic { damage = 1, lifetime = 1000, initialSpeed = 1, hit = False }
+                    , maxCrew = 30
                     , crew = 30
                     }
           }
@@ -286,7 +287,8 @@ initState gameCount =
                     , propulsion = LittleGrayMenTech { movementIncrement = 20 }
                     , rotationSpeed = tau / 32
                     , projectile = Kenetic { damage = 1, lifetime = 1000, initialSpeed = 1, hit = False }
-                    , crew = 30
+                    , maxCrew = 10
+                    , crew = 10
                     }
           }
         ]
@@ -434,3 +436,4 @@ drawKeyboardLayoutRight model =
                 ]
             ]
         ]
+

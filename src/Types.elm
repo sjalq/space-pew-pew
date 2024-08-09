@@ -67,6 +67,7 @@ type BodyType
         , rotationSpeed : Float
         , propulsion : PropulsionType
         , projectile : ProjectileType
+        , maxCrew : Int
         , crew : Int
         }
     | Projectile ProjectileType
