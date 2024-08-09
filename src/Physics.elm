@@ -1,8 +1,14 @@
 module Physics exposing (..)
 
+import Svg.Attributes exposing (in_)
 import Table exposing (Table)
 import Types exposing (..)
 
+
+-- Tau
+
+tau =
+    2 * pi
 
 
 -- Vector operations
@@ -96,15 +102,30 @@ wrapVectorToSpace space vec =
     }
 
 
-move : Space -> Body -> Body
-move space body =
+ship_propultionType : Body -> Maybe PropulsionType
+ship_propultionType body =
+    case body.bodyType of
+        Ship ship ->
+            Just ship.propulsion
+
+        _ ->
+            Nothing
+
+
+applyVelocity : Space -> Body -> Body
+applyVelocity space body =
     let
         newPosition =
             body.position
                 |> addV (scaleV moment body.velocity)
                 |> wrapVectorToSpace space
     in
-    { body | position = newPosition }
+    case ship_propultionType body of
+        Just (LittleGrayMenTech _) ->
+            { body | position = body.position |> wrapVectorToSpace space }
+
+        _ ->    
+            { body | position = newPosition }
 
 
 applyForce : Vector2D -> Body -> Body

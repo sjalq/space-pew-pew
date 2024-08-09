@@ -11,12 +11,13 @@ import L
 import Lamdera
 import Physics exposing (..)
 import RenderSvg exposing (renderGame)
+import Set
 import Svg exposing (..)
 import Table exposing (insertMaybe)
 import Time
 import Types exposing (..)
 import Url
-
+import Task
 
 type alias Model =
     FrontendModel
@@ -88,16 +89,24 @@ update msg model =
             ( { model | gameState = initState model.gameCount }, L.sendToBackend NewGameStarted )
 
 
+performNow : msg -> Cmd msg
+performNow msg_ =
+    Task.perform identity (Task.succeed msg_)
+
+
 updateGame : GameMsg -> GameState -> ( GameState, Cmd FrontendMsg )
 updateGame msg gameState =
     case msg of
+        NoAction ->
+            ( gameState, Cmd.none )
+
         FrameTick time ->
             let
                 newBodies =
                     gameState.bodies
                         |> applyGravityToAll
                         |> updateLifetimes
-                        |> Table.map (\body -> move gameState.space body)
+                        |> Table.map (\body -> applyVelocity gameState.space body)
 
                 finalBodies =
                     performCollisions newBodies
@@ -109,8 +118,17 @@ updateGame msg gameState =
                         | bodies = finalBodies
                         , timeElapsed = gameState.timeElapsed + moment
                     }
+
+                performKeys = 
+                    gameState.depressedKeys 
+                    |> Set.toList 
+                    |> List.map keyToMsg 
+                    |> List.map GameMsg
+                    |> List.map performNow
+                    |> Cmd.batch
             in
-            ( newGameState, Cmd.none )
+            ( newGameState
+            , performKeys)
 
         FireProjectile shipId ->
             let
@@ -162,8 +180,11 @@ updateGame msg gameState =
             , Cmd.none
             )
 
-        NoAction ->
-            ( gameState, Cmd.none )
+        KeyPressed key ->
+            ( { gameState | depressedKeys = Set.insert (String.toLower key) gameState.depressedKeys }, Cmd.none )
+
+        KeyReleased key ->
+            ( { gameState | depressedKeys = Set.remove (String.toLower key) gameState.depressedKeys }, Cmd.none )
 
 
 updateFromBackend : ToFrontend -> Model -> ( Model, Cmd FrontendMsg )
@@ -192,7 +213,7 @@ view model =
         [ Html.div [ Attr.style "text-align" "center", Attr.style "padding-top" "40px" ]
             [ Html.img [ Attr.src "https://lamdera.app/lamdera-logo-black.png", Attr.width 150 ] []
             , Html.div [ Attr.style "display" "flex", Attr.style "justify-content" "space-between" ]
-                [ drawKeyboardLayoutLeft
+                [ drawKeyboardLayoutLeft model
                 , Html.div
                     [ Attr.style "font-family" "sans-serif"
                     , Attr.style "padding-top" "40px"
@@ -200,7 +221,7 @@ view model =
                     ]
                     [ renderGame gameState |> htmlGameMsg
                     ]
-                , drawKeyboardLayoutRight
+                , drawKeyboardLayoutRight model
                 ]
             ]
         , Html.div [ Attr.style "text-align" "center", Attr.style "padding-top" "20px" ]
@@ -258,12 +279,12 @@ initState gameCount =
           , mass = 50
           , position = { x = 700, y = 500 }
           , velocity = { x = 0, y = 0 }
-          , radius = 50
+          , radius = 32
           , bodyType =
                 Ship
                     { rotation = 0
                     , propulsion = LittleGrayMenTech { movementIncrement = 20 }
-                    , rotationSpeed = 0.1
+                    , rotationSpeed = tau / 8
                     , projectile = Kenetic { damage = 1, lifetime = 1000, initialSpeed = 1, hit = False }
                     , crew = 30
                     }
@@ -273,6 +294,7 @@ initState gameCount =
     , timeElapsed = 0
     , space = { width = 1200, height = 700 }
     , entropyCount = 0
+    , depressedKeys = Set.empty
     }
 
 
@@ -282,8 +304,12 @@ listOfBodies model =
 
 subscribeToKeyPresses : Sub FrontendMsg
 subscribeToKeyPresses =
-    Browser.Events.onKeyDown (Decode.map keyPressed keyDecoder)
-        |> Sub.map GameMsg
+    Sub.batch
+        [ Browser.Events.onKeyDown (Decode.map KeyPressed keyDecoder)
+            |> Sub.map GameMsg
+        , Browser.Events.onKeyUp (Decode.map KeyReleased keyDecoder)
+            |> Sub.map GameMsg
+        ]
 
 
 keyDecoder : Decode.Decoder String
@@ -307,7 +333,21 @@ keyDecoder =
 
 keyPressed : String -> GameMsg
 keyPressed key =
-    case key of
+    KeyPressed key
+
+
+keyReleased : String -> GameMsg
+keyReleased key =
+    KeyReleased key
+
+
+keyToMsg : String -> GameMsg
+keyToMsg key =
+    let
+        key_ =
+            String.toLower key
+    in
+    case key_ of
         "w" ->
             Propel 2
 
@@ -323,65 +363,74 @@ keyPressed key =
         "g" ->
             FireProjectile 2
 
-        "ArrowUp" ->
+        "arrowup" ->
             Propel 3
 
-        "ArrowLeft" ->
+        "arrowleft" ->
             Rotate Left 3
 
-        "ArrowRight" ->
+        "arrowright" ->
             Rotate Right 3
 
-        "Shift" ->
+        "shift" ->
             FireProjectile 3
 
-        "Control" ->
+        "control" ->
             FireProjectile 3
 
         _ ->
-            let
-                _ =
-                    Debug.log "keyPressed" key
-            in
             NoAction
 
 
-drawKey : String -> String -> Html msg
-drawKey key action =
+drawKey : String -> String -> String -> Model -> Html msg
+drawKey icon key action model =
+    let
+        isPressed =
+            Set.member (String.toLower key) model.gameState.depressedKeys
+    in
     div [ Attr.style "margin-bottom" "10px" ]
-        [ div [ Attr.style "border" "1px solid black", Attr.style "padding" "5px", Attr.style "display" "inline-block" ]
-            [ Html.text key ]
+        [ div
+            [ Attr.style "border" "1px solid black"
+            , Attr.style "padding" "5px"
+            , Attr.style "display" "inline-block"
+            , if isPressed then
+                Attr.style "background-color" "red"
+
+              else
+                Attr.style "background-color" "white"
+            ]
+            [ Html.text icon ]
         , Html.text ("-" ++ action)
         ]
 
 
-drawKeyboardLayoutLeft : Html FrontendMsg
-drawKeyboardLayoutLeft =
+drawKeyboardLayoutLeft : Model -> Html FrontendMsg
+drawKeyboardLayoutLeft model =
     div [ Attr.style "text-align" "center", Attr.style "font-family" "Arial, sans-serif", Attr.style "margin-left" "50px" ]
         [ h2 [ Attr.style "margin-bottom" "20px" ] [ Html.text "Left Player Controls" ]
         , div [ Attr.style "display" "flex", Attr.style "justify-content" "center" ]
             [ div [ Attr.style "margin" "10px", Attr.style "text-align" "left" ]
-                [ drawKey "W" "Propel"
-                , drawKey "A" "Rotate Left"
-                , drawKey "D" "Rotate Right"
-                , drawKey "F" "Fire Primary Weapon"
-                , drawKey "G" "Fire Secondary Weapon"
+                [ drawKey "W" "W" "Propel" model
+                , drawKey "A" "A" "Rotate Left" model
+                , drawKey "D" "D" "Rotate Right" model
+                , drawKey "F" "F" "Fire Primary Weapon" model
+                , drawKey "G" "G" "Fire Secondary Weapon" model
                 ]
             ]
         ]
 
 
-drawKeyboardLayoutRight : Html FrontendMsg
-drawKeyboardLayoutRight =
+drawKeyboardLayoutRight : Model -> Html FrontendMsg
+drawKeyboardLayoutRight model =
     div [ Attr.style "text-align" "center", Attr.style "font-family" "Arial, sans-serif", Attr.style "margin-right" "50px" ]
         [ h2 [ Attr.style "margin-bottom" "20px" ] [ Html.text "Right Player Controls" ]
         , div [ Attr.style "display" "flex", Attr.style "justify-content" "center" ]
             [ div [ Attr.style "margin" "10px", Attr.style "text-align" "left" ]
-                [ drawKey "↑" "Propel"
-                , drawKey "←" "Rotate Left"
-                , drawKey "→" "Rotate Right"
-                , drawKey "Shift" "Fire Primary Weapon"
-                , drawKey "Control" "Fire Secondary Weapon"
+                [ drawKey "↑" "ArrowUp" "Propel" model
+                , drawKey "←" "ArrowLeft" "Rotate Left" model
+                , drawKey "→" "ArrowRight" "Rotate Right" model
+                , drawKey "Shift" "Shift" "Fire Primary Weapon" model
+                , drawKey "Control" "Control" "Fire Secondary Weapon" model
                 ]
             ]
         ]

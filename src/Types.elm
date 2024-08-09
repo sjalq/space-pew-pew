@@ -5,6 +5,7 @@ import Browser.Navigation exposing (Key)
 import Table exposing (Table)
 import Time
 import Url exposing (Url)
+import Set exposing (Set)
 
 
 type alias FrontendModel =
@@ -100,6 +101,7 @@ type alias GameState =
     , timeElapsed : Float
     , space : Space
     , entropyCount : Int
+    , depressedKeys : Set String
     }
 
 
@@ -124,6 +126,8 @@ type GameMsg
     | FireProjectile Int
     | Rotate Direction Int
     | Propel Int
+    | KeyPressed String
+    | KeyReleased String
 
 
 moment : Float

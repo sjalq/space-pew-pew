@@ -209,22 +209,107 @@ hashToColor id =
     "#" ++ r ++ g ++ b
 
 
+colorA ship =
+    hashToColor ship.id
+
+
+colorB ship =
+    hashToColor ship.id
+
+
+rotation ship =
+    case ship.bodyType of
+        Ship ship_ ->
+            ship_.rotation
+
+        _ ->
+            0
+
+
 renderShipSvg ship =
-    let
-        rotation =
-            case ship.bodyType of
-                Ship ship_ ->
-                    ship_.rotation
+    case ship.bodyType of
+        Ship ship_ ->
+            case ship_.propulsion of
+                LittleGrayMenTech _ ->
+                    renderLittleGrayMenTechShip ship
 
                 _ ->
-                    0
+                    renderHumanShip ship
 
-        wingColor =
-            hashToColor ship.id
+        _ ->
+            text ""
 
-        bodyColor =
-            hashToColor ship.id
-    in
+
+renderLittleGrayMenTechShip ship =
+    g
+        [ SvgAttr.transform
+            ("translate("
+                ++ String.fromFloat ship.position.x
+                ++ ","
+                ++ String.fromFloat ship.position.y
+                ++ ")"
+                ++ "rotate("
+                ++ String.fromFloat (rotation ship * 180 / pi)
+                ++ ")"
+            )
+        ]
+        [ defs
+            []
+            [ radialGradient
+                [ SvgAttr.id "saucerGradient"
+                , SvgAttr.cx "50%"
+                , SvgAttr.cy "50%"
+                , SvgAttr.r "50%"
+                , SvgAttr.fx "50%"
+                , SvgAttr.fy "50%"
+                ]
+                [ stop [ SvgAttr.offset "0%", SvgAttr.stopColor "#e0e0e0", SvgAttr.stopOpacity "1" ] []
+                , stop [ SvgAttr.offset "70%", SvgAttr.stopColor "#a0a0a0", SvgAttr.stopOpacity "1" ] []
+                , stop [ SvgAttr.offset "100%", SvgAttr.stopColor "#808080", SvgAttr.stopOpacity "1" ] []
+                ]
+            ]
+        , circle
+            [ SvgAttr.cx "0"
+            , SvgAttr.cy "0"
+            , SvgAttr.r (String.fromFloat ship.radius)
+            , SvgAttr.fill "url(#saucerGradient)"
+            , SvgAttr.stroke (colorA ship)
+            , SvgAttr.strokeWidth "2"
+            ]
+            []
+        , circle
+            [ SvgAttr.cx "0"
+            , SvgAttr.cy "0"
+            , SvgAttr.r (String.fromFloat (ship.radius / 3))
+            , SvgAttr.fill "#4a90e2"
+            , SvgAttr.stroke (colorB ship)
+            , SvgAttr.strokeWidth "2"
+            ]
+            []
+        , List.map
+            (\( x, y, color ) ->
+                circle
+                    [ SvgAttr.cx (String.fromFloat (x * ship.radius / 100 - ship.radius))
+                    , SvgAttr.cy (String.fromFloat (y * ship.radius / 100 - ship.radius))
+                    , SvgAttr.r (String.fromFloat (ship.radius * 0.05))
+                    , SvgAttr.fill color
+                    ]
+                    []
+            )
+            [ ( 25, 100, "#ffff00" )
+            , ( 175, 100, "#ff0000" )
+            , ( 100, 25, "#ffff00" )
+            , ( 100, 175, "#ffff00" )
+            , ( 50, 50, "#ffff00" )
+            , ( 150, 50, "#ffff00" )
+            , ( 50, 150, "#ffff00" )
+            , ( 150, 150, "#ffff00" )
+            ]
+            |> g []
+        ]
+
+
+renderHumanShip ship =
     g
         [ SvgAttr.transform
             ("translate("
@@ -233,7 +318,7 @@ renderShipSvg ship =
                 ++ String.fromFloat ship.position.y
                 ++ ") "
                 ++ "rotate("
-                ++ String.fromFloat (rotation * 180 / pi)
+                ++ String.fromFloat (rotation ship * 180 / pi)
                 ++ ")"
             )
         ]
@@ -251,7 +336,7 @@ renderShipSvg ship =
         , -- Ship body
           path
             [ SvgAttr.d "M30 0 L-30 20 L-30 -20 Z"
-            , SvgAttr.fill bodyColor
+            , SvgAttr.fill (colorA ship)
             , SvgAttr.stroke "#2a2a2a"
             , SvgAttr.strokeWidth "2"
             ]
@@ -269,7 +354,7 @@ renderShipSvg ship =
         , -- Left Wing
           path
             [ SvgAttr.d "M-10 10 L-25 25 L-10 20 Z"
-            , SvgAttr.fill wingColor
+            , SvgAttr.fill (colorB ship)
             , SvgAttr.stroke "#2a2a2a"
             , SvgAttr.strokeWidth "2"
             ]
@@ -277,7 +362,7 @@ renderShipSvg ship =
         , -- Right Wing
           path
             [ SvgAttr.d "M-10 -10 L-25 -25 L-10 -20 Z"
-            , SvgAttr.fill wingColor
+            , SvgAttr.fill (colorB ship)
             , SvgAttr.stroke "#2a2a2a"
             , SvgAttr.strokeWidth "2"
             ]

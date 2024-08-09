@@ -1,6 +1,6 @@
 {
     "elmLS.elmPath": "/usr/local/bin/lamdera",
-    "elmLS.elmFormatPath": "elm-format",
+    "elmLS.elmFormatPath": "",
     "elmLS.elmTestPath": "",
     "elmLS.trace.server": "off",
     "elmLS.onlyUpdateDiagnosticsOnSave": false

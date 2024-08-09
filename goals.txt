@@ -26,9 +26,11 @@
 
 2024-08-08
 ----------
-* Make projectiles
++ Make projectiles
++ Make planet a beautiful gas giant
+
+2024-08-09
 ----------
-* Make planet a beautiful gas giant
-* Make ships high res top view
-* Arilou
-* Human
++ Make the Grey's ship behave more grey and look more grey
+--
+* Fix key stickiness
