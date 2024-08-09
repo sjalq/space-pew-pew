@@ -1,14 +1,16 @@
 module Physics exposing (..)
 
-import Svg.Attributes exposing (in_)
 import Table exposing (Table)
 import Types exposing (..)
 
 
+
 -- Tau
+
 
 tau =
     2 * pi
+
 
 
 -- Vector operations
@@ -25,6 +27,13 @@ subV : Vector2D -> Vector2D -> Vector2D
 subV v1 v2 =
     { x = v1.x - v2.x
     , y = v1.y - v2.y
+    }
+
+
+invertV : Vector2D -> Vector2D
+invertV vec =
+    { x = -vec.x
+    , y = -vec.y
     }
 
 
@@ -124,7 +133,7 @@ applyVelocity space body =
         Just (LittleGrayMenTech _) ->
             { body | position = body.position |> wrapVectorToSpace space }
 
-        _ ->    
+        _ ->
             { body | position = newPosition }
 
 
@@ -350,12 +359,39 @@ collide bodyA bodyB =
 
             correctedPositionB =
                 addV bodyB.position correctionVectorB
+
+            bodyA_ =
+                { bodyA | position = correctedPositionA }
+
+            bodyB_ =
+                { bodyB | position = correctedPositionB }
         in
-        ( True
-        , [ { bodyA | position = correctedPositionA, velocity = newVelocityA }
-          , { bodyB | position = correctedPositionB, velocity = newVelocityB }
-          ]
-        )
+        case ( body_isNewtonian bodyA, body_isNewtonian bodyB ) of
+            ( True, True ) ->
+                ( True
+                , [ { bodyA_ | velocity = newVelocityA }
+                  , { bodyB_ | velocity = newVelocityB }
+                  ]
+                )
+
+            ( True, False ) ->
+                ( True
+                , [ { bodyA_ | velocity = addV newVelocityA (invertV newVelocityB) }
+                  , bodyB_
+                  ]
+                )
+
+            ( False, True ) ->
+                ( True
+                , [ { bodyB_ | velocity = addV newVelocityB (invertV newVelocityA) }
+                  , bodyA_
+                  ]
+                )
+
+            _ ->
+                ( True
+                , [ bodyA_, bodyB_ ]
+                )
 
     else
         ( False, [ bodyA, bodyB ] )
@@ -442,6 +478,21 @@ ship_destroyed body =
 
         _ ->
             False
+
+
+body_isNewtonian : Body -> Bool
+body_isNewtonian body =
+    case body.bodyType of
+        Ship ship ->
+            case ship.propulsion of
+                LittleGrayMenTech _ ->
+                    False
+
+                _ ->
+                    True
+
+        _ ->
+            True
 
 
 rotate : Direction -> Body -> Body

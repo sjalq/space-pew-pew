@@ -6,6 +6,8 @@ import Table exposing (Table)
 import Time
 import Url exposing (Url)
 import Set exposing (Set)
+import Time
+import Lamdera exposing (SessionId)
 
 
 type alias FrontendModel =
@@ -13,12 +15,21 @@ type alias FrontendModel =
     , gameState : GameState
     , gameCount : Int
     , pewsPewed : Int
+    , chatInput : String
+    , trollbox : List ChatMessage
     }
 
 
 type alias BackendModel =
     { gameCount : Int
     , pewsPewed : Int
+    , trollbox : List ChatMessage
+    }
+
+type alias ChatMessage = 
+    { timestamp : Time.Posix
+    , clientId : SessionId
+    , message : String
     }
 
 
@@ -28,21 +39,25 @@ type FrontendMsg
     | NoOpFrontendMsg
     | GameMsg GameMsg
     | NewGame
+    | SendChat 
+    | ChatInputChanged String
 
 
 type ToBackend
     = NoOpToBackend
     | NewGameStarted
     | PewPewed
+    | AddChat String
 
 
 type BackendMsg
     = NoOpBackendMsg
+    | AddChatWithTime SessionId String Time.Posix
 
 
 type ToFrontend
     = NoOpToFrontend
-    | GlobalUpdate { gameCount : Int, pewsPewed : Int }
+    | GlobalUpdate { gameCount : Int, pewsPewed : Int, trollbox : List ChatMessage }
 
 
 

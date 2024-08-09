@@ -433,9 +433,6 @@ drawCrewHealthBar position ship =
                 blockHeight =
                     5
 
-                rows =
-                    ship_.maxCrew // 2
-
                 leftColumnCount =
                     ship_.crew // 2
 

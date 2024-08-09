@@ -14,10 +14,11 @@ import RenderSvg exposing (renderGame)
 import Set
 import Svg exposing (..)
 import Table exposing (insertMaybe)
+import Task
 import Time
 import Types exposing (..)
 import Url
-import Task
+
 
 type alias Model =
     FrontendModel
@@ -49,6 +50,8 @@ init url key =
       , gameState = initState 0
       , gameCount = 0
       , pewsPewed = 0
+      , chatInput = ""
+      , trollbox = []
       }
     , L.sendToBackend NewGameStarted
     )
@@ -88,6 +91,14 @@ update msg model =
         NewGame ->
             ( { model | gameState = initState model.gameCount }, L.sendToBackend NewGameStarted )
 
+        SendChat ->
+            ( { model | chatInput = "" }
+            , L.sendToBackend (AddChat model.chatInput)
+            )
+
+        ChatInputChanged newInput ->
+            ( { model | chatInput = newInput }, Cmd.none )
+
 
 performNow : msg -> Cmd msg
 performNow msg_ =
@@ -119,16 +130,17 @@ updateGame msg gameState =
                         , timeElapsed = gameState.timeElapsed + moment
                     }
 
-                performKeys = 
-                    gameState.depressedKeys 
-                    |> Set.toList 
-                    |> List.map keyToMsg 
-                    |> List.map GameMsg
-                    |> List.map performNow
-                    |> Cmd.batch
+                performKeys =
+                    gameState.depressedKeys
+                        |> Set.toList
+                        |> List.map keyToMsg
+                        |> List.map GameMsg
+                        |> List.map performNow
+                        |> Cmd.batch
             in
             ( newGameState
-            , performKeys)
+            , performKeys
+            )
 
         FireProjectile shipId ->
             let
@@ -194,7 +206,13 @@ updateFromBackend msg model =
             ( model, Cmd.none )
 
         GlobalUpdate global ->
-            ( { model | gameCount = global.gameCount, pewsPewed = global.pewsPewed }, Cmd.none )
+            ( { model
+                | gameCount = global.gameCount
+                , pewsPewed = global.pewsPewed
+                , trollbox = global.trollbox
+              }
+            , Cmd.none
+            )
 
 
 view : Model -> Browser.Document FrontendMsg
@@ -221,7 +239,14 @@ view model =
                     ]
                     [ renderGame gameState |> htmlGameMsg
                     ]
-                , drawKeyboardLayoutRight model
+                , Html.div
+                    [ Attr.style "display" "flex"
+                    , Attr.style "flex-direction" "column"
+                    , Attr.style "align-items" "center"
+                    ]
+                    [ drawKeyboardLayoutRight model
+                    , drawTrollbox model
+                    ]
                 ]
             ]
         , Html.div [ Attr.style "text-align" "center", Attr.style "padding-top" "20px" ]
@@ -261,7 +286,7 @@ initState gameCount =
           , radius = 50
           , bodyType = Planet { gravity = 9.8 }
           }
-        , { id = 2 
+        , { id = 2
           , mass = 50
           , position = { x = 100, y = 100 }
           , velocity = { x = 0, y = 0 }
@@ -276,7 +301,7 @@ initState gameCount =
                     , crew = 30
                     }
           }
-        , { id = 3 
+        , { id = 3
           , mass = 50
           , position = { x = 700, y = 500 }
           , velocity = { x = 0, y = 0 }
@@ -437,3 +462,36 @@ drawKeyboardLayoutRight model =
             ]
         ]
 
+
+drawTrollbox : Model -> Html FrontendMsg
+drawTrollbox model =
+    div [ Attr.style "width" "300px", Attr.style "border" "1px solid #ccc", Attr.style "margin" "20px auto" ]
+        [ div
+            [ Attr.style "height" "300px"
+            , Attr.style "overflow-y" "scroll"
+            , Attr.style "padding" "10px"
+            , Attr.style "background-color" "#f0f0f0"
+            ]
+            (List.map drawChatMessage (List.reverse model.trollbox))
+        , div [ Attr.style "display" "flex", Attr.style "padding" "10px" ]
+            [ input
+                [ Attr.type_ "text"
+                , Attr.placeholder "Type your message..."
+                , Attr.value model.chatInput
+                , Attr.style "flex-grow" "1"
+                , Attr.style "margin-right" "10px"
+                , Html.Events.onInput ChatInputChanged
+                ]
+                []
+            , Html.button [ Html.Events.onClick SendChat, Attr.style "padding" "5px 10px" ]
+                [ Html.text "Send" ]
+            ]
+        ]
+
+
+drawChatMessage : ChatMessage -> Html FrontendMsg
+drawChatMessage msg =
+    div [ Attr.style "margin-bottom" "5px" ]
+        [ span [ Attr.style "font-weight" "bold" ] [ Html.text (String.left 6 msg.clientId ++ ": ") ]
+        , Html.text msg.message
+        ]
