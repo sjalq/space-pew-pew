@@ -31,8 +31,8 @@ renderGame gameState =
         , SvgAttr.style "background-color: black" -- Add a black background to represent space
         ]
         [ ship1 |> Maybe.map (drawCrewHealthBar { x = 10, y = (toFloat gameHeight / 2) - 25 }) |> Maybe.withDefault (text "")
-        , ship2 |> Maybe.map (drawCrewHealthBar { x = (toFloat gameWidth - 54), y = (toFloat gameHeight / 2) - 25 }) |> Maybe.withDefault (text "")
-        , gameState.bodies |> renderBodies
+        , ship2 |> Maybe.map (drawCrewHealthBar { x = toFloat gameWidth - 54, y = (toFloat gameHeight / 2) - 25 }) |> Maybe.withDefault (text "")
+        , gameState.bodies |> Table.map (\b -> { b | id = b.id + gameState.entropyCount }) |> renderBodies
         ]
 
 
@@ -239,7 +239,11 @@ colorA ship =
 
 
 colorB ship =
-    hashToColor ship.id
+    hashToColor (ship.id + 1)
+
+
+colorC ship =
+    hashToColor (ship.id + 2)
 
 
 rotation ship =
@@ -298,7 +302,7 @@ renderLittleGrayMenTechShip ship =
             , SvgAttr.cy "0"
             , SvgAttr.r (String.fromFloat ship.radius)
             , SvgAttr.fill "url(#saucerGradient)"
-            , SvgAttr.stroke (colorA ship)
+            , SvgAttr.stroke "#808080"
             , SvgAttr.strokeWidth "2"
             ]
             []
@@ -306,8 +310,8 @@ renderLittleGrayMenTechShip ship =
             [ SvgAttr.cx "0"
             , SvgAttr.cy "0"
             , SvgAttr.r (String.fromFloat (ship.radius / 3))
-            , SvgAttr.fill "#4a90e2"
-            , SvgAttr.stroke (colorB ship)
+            , SvgAttr.fill (colorB ship)
+            , SvgAttr.stroke (colorC ship)
             , SvgAttr.strokeWidth "2"
             ]
             []
@@ -451,9 +455,9 @@ drawCrewHealthBar position ship =
             g
                 [ SvgAttr.transform
                     ("translate("
-                        ++ String.fromFloat (position.x)
+                        ++ String.fromFloat position.x
                         ++ ","
-                        ++ String.fromFloat (position.y)
+                        ++ String.fromFloat position.y
                         ++ ")"
                     )
                 ]

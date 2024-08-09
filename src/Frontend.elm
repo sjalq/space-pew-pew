@@ -261,7 +261,7 @@ initState gameCount =
           , radius = 50
           , bodyType = Planet { gravity = 9.8 }
           }
-        , { id = 2 + gameCount
+        , { id = 2 
           , mass = 50
           , position = { x = 100, y = 100 }
           , velocity = { x = 0, y = 0 }
@@ -276,7 +276,7 @@ initState gameCount =
                     , crew = 30
                     }
           }
-        , { id = 3 + gameCount
+        , { id = 3 
           , mass = 50
           , position = { x = 700, y = 500 }
           , velocity = { x = 0, y = 0 }
@@ -295,7 +295,7 @@ initState gameCount =
             |> Table.fromList
     , timeElapsed = 0
     , space = { width = 1200, height = 700 }
-    , entropyCount = 0
+    , entropyCount = gameCount
     , depressedKeys = Set.empty
     }
 
