@@ -284,7 +284,7 @@ initState gameCount =
                 Ship
                     { rotation = 0
                     , propulsion = LittleGrayMenTech { movementIncrement = 20 }
-                    , rotationSpeed = tau / 8
+                    , rotationSpeed = tau / 32
                     , projectile = Kenetic { damage = 1, lifetime = 1000, initialSpeed = 1, hit = False }
                     , crew = 30
                     }
