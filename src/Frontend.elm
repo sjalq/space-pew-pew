@@ -3,6 +3,7 @@ module Frontend exposing (..)
 import Browser exposing (UrlRequest(..))
 import Browser.Events
 import Browser.Navigation as Nav
+import GameLoop
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events
@@ -39,7 +40,7 @@ app =
 subscriptions : Model -> Sub FrontendMsg
 subscriptions _ =
     Sub.batch
-        [ Time.every moment (\time -> GameMsg (FrameTick time))
+        [ Time.every moment (\time -> FEGameMsg (FrameTick time))
         , subscribeToKeyPresses
         ]
 
@@ -78,10 +79,10 @@ update msg model =
         NoOpFrontendMsg ->
             ( model, Cmd.none )
 
-        GameMsg gameMsg ->
+        FEGameMsg gameMsg ->
             let
                 ( newGameState, cmd ) =
-                    model.gameState |> updateGame gameMsg
+                    model.gameState |> GameLoop.updateGame gameMsg
 
                 newModel =
                     { model | gameState = newGameState }
@@ -98,105 +99,6 @@ update msg model =
 
         ChatInputChanged newInput ->
             ( { model | chatInput = newInput }, Cmd.none )
-
-
-performNow : msg -> Cmd msg
-performNow msg_ =
-    Task.perform identity (Task.succeed msg_)
-
-
-updateGame : GameMsg -> GameState -> ( GameState, Cmd FrontendMsg )
-updateGame msg gameState =
-    case msg of
-        NoAction ->
-            ( gameState, Cmd.none )
-
-        FrameTick time ->
-            let
-                newBodies =
-                    gameState.bodies
-                        |> applyGravityToAll
-                        |> updateLifetimes
-                        |> Table.map (\body -> applyVelocity gameState.space body)
-
-                finalBodies =
-                    performCollisions newBodies
-                        |> Table.filter (not << projectile_destroyed)
-                        |> Table.filter (not << ship_destroyed)
-
-                newGameState =
-                    { gameState
-                        | bodies = finalBodies
-                        , timeElapsed = gameState.timeElapsed + moment
-                    }
-
-                performKeys =
-                    gameState.depressedKeys
-                        |> Set.toList
-                        |> List.map keyToMsg
-                        |> List.map GameMsg
-                        |> List.map performNow
-                        |> Cmd.batch
-            in
-            ( newGameState
-            , performKeys
-            )
-
-        FireProjectile shipId ->
-            let
-                -- find the ship
-                -- generate the appropriate projectile
-                ship =
-                    gameState.bodies
-                        |> Table.get shipId
-
-                newProjectile =
-                    ship
-                        |> Maybe.andThen ship_fireProjectile
-
-                newBodies =
-                    Table.insertMaybe newProjectile gameState.bodies
-
-                newState =
-                    { gameState | bodies = newBodies }
-            in
-            ( newState, L.sendToBackend PewPewed )
-
-        Rotate direction bodyId ->
-            let
-                ship =
-                    gameState.bodies
-                        |> Table.get bodyId
-                        |> Maybe.map (rotate direction)
-            in
-            ( { gameState
-                | bodies =
-                    gameState.bodies
-                        |> insertMaybe ship
-              }
-            , Cmd.none
-            )
-
-        Propel bodyId ->
-            let
-                bodyToAccelerate =
-                    gameState.bodies
-                        |> Table.get bodyId
-                        |> Maybe.map ship_propel
-            in
-            ( { gameState
-                | bodies =
-                    gameState.bodies
-                        |> Table.insertMaybe bodyToAccelerate
-              }
-            , Cmd.none
-            )
-
-        KeyPressed key ->
-            ( { gameState | depressedKeys = Set.insert (String.toLower key) gameState.depressedKeys }, Cmd.none )
-
-        KeyReleased key ->
-            ( { gameState | depressedKeys = Set.remove (String.toLower key) gameState.depressedKeys }, Cmd.none )
 
 
 updateFromBackend : ToFrontend -> Model -> ( Model, Cmd FrontendMsg )
@@ -268,7 +170,7 @@ view model =
 
 gameMsgToFrontendMsg : GameMsg -> FrontendMsg
 gameMsgToFrontendMsg msg =
-    GameMsg msg
+    FEGameMsg msg
 
 
 htmlGameMsg : Html GameMsg -> Html FrontendMsg
@@ -333,29 +235,15 @@ subscribeToKeyPresses : Sub FrontendMsg
 subscribeToKeyPresses =
     Sub.batch
         [ Browser.Events.onKeyDown (Decode.map KeyPressed keyDecoder)
-            |> Sub.map GameMsg
+            |> Sub.map FEGameMsg
         , Browser.Events.onKeyUp (Decode.map KeyReleased keyDecoder)
-            |> Sub.map GameMsg
+            |> Sub.map FEGameMsg
         ]
 
 
 keyDecoder : Decode.Decoder String
 keyDecoder =
     Decode.field "key" Decode.string
-
-
-
---   MELEE CONTROLS SUMMARY
--- Top Player
--- E:                       Thrust
--- S and F:                 Steer
--- Q:                       Fire Primary Weapon
--- A:                       Fire Secondary Weapon
--- Bottom Player
--- UP or ENTER:             Thrust
--- LEFT and RIGHT:          Steer
--- RIGHT SHIFT:             Fire Primary Weapon
--- RIGHT CTRL:              Fire Secondary Weapon
 
 
 keyPressed : String -> GameMsg
@@ -366,47 +254,6 @@ keyPressed key =
 keyReleased : String -> GameMsg
 keyReleased key =
     KeyReleased key
-
-
-keyToMsg : String -> GameMsg
-keyToMsg key =
-    let
-        key_ =
-            String.toLower key
-    in
-    case key_ of
-        "w" ->
-            Propel 2
-
-        "a" ->
-            Rotate Left 2
-
-        "d" ->
-            Rotate Right 2
-
-        "f" ->
-            FireProjectile 2
-
-        "g" ->
-            FireProjectile 2
-
-        "arrowup" ->
-            Propel 3
-
-        "arrowleft" ->
-            Rotate Left 3
-
-        "arrowright" ->
-            Rotate Right 3
-
-        "shift" ->
-            FireProjectile 3
-
-        "control" ->
-            FireProjectile 3
-
-        _ ->
-            NoAction
 
 
 drawKey : String -> String -> String -> Model -> Html msg

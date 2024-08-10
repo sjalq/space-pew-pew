@@ -37,7 +37,7 @@ type FrontendMsg
     = UrlClicked UrlRequest
     | UrlChanged Url
     | NoOpFrontendMsg
-    | GameMsg GameMsg
+    | FEGameMsg GameMsg
     | NewGame
     | SendChat 
     | ChatInputChanged String
@@ -52,6 +52,7 @@ type ToBackend
 
 type BackendMsg
     = NoOpBackendMsg
+    | BEGameMsg GameMsg
     | AddChatWithTime SessionId String Time.Posix
 
 
