@@ -1,12 +1,66 @@
 module GameLoop exposing (..)
 
-import Types exposing (..)
-import Physics exposing (..)
-import Table exposing (Table)
-import Set exposing (Set)
 import L exposing (..)
+import Lamdera exposing (ClientId)
+import Physics exposing (..)
+import Set exposing (Set)
+import Table exposing (Table)
+import Types exposing (..)
 
-updateGame : GameMsg -> GameState -> ( GameState, Cmd FrontendMsg )
+
+initState : Int -> ClientId -> ClientId -> GameState
+initState gameCount player1 player2 =
+    { id = 0
+    , player1Id = player1
+    , player2Id = player2
+    , bodies =
+        [ { id = 1
+          , mass = 100000000000
+          , position = { x = 600, y = 350 }
+          , velocity = { x = 0, y = 0 }
+          , radius = 50
+          , bodyType = Planet { gravity = 9.8 }
+          }
+        , { id = 2
+          , mass = 50
+          , position = { x = 100, y = 100 }
+          , velocity = { x = 0, y = 0 }
+          , radius = 50
+          , bodyType =
+                Ship
+                    { rotation = 0
+                    , propulsion = Newtonian { thrust = 1 }
+                    , rotationSpeed = 0.1
+                    , projectile = Kenetic { damage = 1, lifetime = 1000, initialSpeed = 1, hit = False }
+                    , maxCrew = 30
+                    , crew = 30
+                    }
+          }
+        , { id = 3
+          , mass = 50
+          , position = { x = 700, y = 500 }
+          , velocity = { x = 0, y = 0 }
+          , radius = 32
+          , bodyType =
+                Ship
+                    { rotation = 0
+                    , propulsion = LittleGrayMenTech { movementIncrement = 20 }
+                    , rotationSpeed = tau / 32
+                    , projectile = Kenetic { damage = 1, lifetime = 1000, initialSpeed = 1, hit = False }
+                    , maxCrew = 10
+                    , crew = 10
+                    }
+          }
+        ]
+            |> Table.fromList
+    , timeElapsed = 0
+    , space = { width = 1200, height = 700 }
+    , entropyCount = gameCount
+    , depressedKeys = Set.empty
+    }
+
+
+updateGame : GameMsg -> GameState -> ( GameState, Cmd BackendMsg )
 updateGame msg gameState =
     case msg of
         NoAction ->
@@ -35,7 +89,7 @@ updateGame msg gameState =
                     gameState.depressedKeys
                         |> Set.toList
                         |> List.map keyToMsg
-                        |> List.map FEGameMsg
+                        |> List.map (BEGameMsg gameState.id)
                         |> List.map performNow
                         |> Cmd.batch
             in
@@ -98,6 +152,7 @@ updateGame msg gameState =
 
         KeyReleased key ->
             ( { gameState | depressedKeys = Set.remove (String.toLower key) gameState.depressedKeys }, Cmd.none )
+
 
 keyToMsg : String -> GameMsg
 keyToMsg key =

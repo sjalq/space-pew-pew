@@ -2,21 +2,21 @@ module Types exposing (..)
 
 import Browser exposing (UrlRequest)
 import Browser.Navigation exposing (Key)
+import Dict exposing (Dict)
+import Lamdera exposing (ClientId, SessionId)
+import Set exposing (Set)
 import Table exposing (Table)
 import Time
 import Url exposing (Url)
-import Set exposing (Set)
-import Time
-import Lamdera exposing (SessionId)
 
 
 type alias FrontendModel =
     { key : Key
-    , gameState : GameState
     , gameCount : Int
     , pewsPewed : Int
     , chatInput : String
     , trollbox : List ChatMessage
+    , gameState : GameState
     }
 
 
@@ -24,9 +24,12 @@ type alias BackendModel =
     { gameCount : Int
     , pewsPewed : Int
     , trollbox : List ChatMessage
+    , gameStates : Table GameState
+    , clientCurrentGames : Dict ClientId GameId
     }
 
-type alias ChatMessage = 
+
+type alias ChatMessage =
     { timestamp : Time.Posix
     , clientId : SessionId
     , message : String
@@ -39,26 +42,28 @@ type FrontendMsg
     | NoOpFrontendMsg
     | FEGameMsg GameMsg
     | NewGame
-    | SendChat 
+    | SendChat
     | ChatInputChanged String
 
 
 type ToBackend
     = NoOpToBackend
-    | NewGameStarted
+    | StartNewGame
     | PewPewed
     | AddChat String
+    | SubmitCommand GameMsg
 
 
 type BackendMsg
-    = NoOpBackendMsg
-    | BEGameMsg GameMsg
+    = NoOpBackendMsg 
+    | BEGameMsg GameId GameMsg
     | AddChatWithTime SessionId String Time.Posix
 
 
 type ToFrontend
     = NoOpToFrontend
-    | GlobalUpdate { gameCount : Int, pewsPewed : Int, trollbox : List ChatMessage }
+    | UpdateGlobal { gameCount : Int, pewsPewed : Int, trollbox : List ChatMessage }
+    | UpdateGameState GameState
 
 
 
@@ -113,12 +118,19 @@ type alias Vector2D =
     }
 
 
+type alias GameId =
+    Int
+
+
 type alias GameState =
-    { bodies : Table Body
+    { id : GameId
+    , bodies : Table Body
     , timeElapsed : Float
     , space : Space
     , entropyCount : Int
     , depressedKeys : Set String
+    , player1Id : ClientId
+    , player2Id : ClientId
     }
 
 
@@ -149,4 +161,4 @@ type GameMsg
 
 moment : Float
 moment =
-    1000 / 60
+    1000 / 24

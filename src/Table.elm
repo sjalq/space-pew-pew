@@ -45,28 +45,31 @@ filterMap fn (Table nextId_ table) =
 
 
 
-insert : { a | id : Int } -> Table { a | id : Int } -> Table { a | id : Int }
-insert record (Table id dict) =
+insertReturningID record (Table id dict) =
     let
-        nextId_ =
-            nextId (Table id dict)
+        id_ =
+            if record.id /= 0 then
+                max id record.id
+            else
+                nextId (Table id dict)
 
         newTable =
             if record.id /= 0 then
-                let
-                    maxId =
-                        max id record.id
-                in
-                Table maxId (Dict.insert record.id record dict)
+                Table id_ (Dict.insert record.id record dict)
 
             else
                 let
                     newRecord =
-                        { record | id = nextId_ }
+                        { record | id = id_ }
                 in
-                Table nextId_ (Dict.insert newRecord.id newRecord dict)
+                Table id_ (Dict.insert newRecord.id newRecord dict)
     in
-    newTable
+    ( id_, newTable )
+
+
+insert record table =
+    insertReturningID record table |> Tuple.second
+
 
 
 insertMaybe : Maybe { a | id : Int } -> Table { a | id : Int } -> Table { a | id : Int }
@@ -79,6 +82,11 @@ insertMaybe record table =
 remove : Int -> Table a -> Table a
 remove id (Table nextId_ dict) =
     Table nextId_ (Dict.remove id dict)
+
+
+removeMany : List Int -> Table a -> Table a
+removeMany ids table =
+    List.foldl remove table ids
 
 
 toList : Table a -> List a

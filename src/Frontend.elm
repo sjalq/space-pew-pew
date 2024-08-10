@@ -15,8 +15,7 @@ import RenderSvg exposing (renderGame)
 import Set
 import Svg exposing (..)
 import Table exposing (insertMaybe)
-import Task
-import Time
+import GameLoop
 import Types exposing (..)
 import Url
 
@@ -40,21 +39,22 @@ app =
 subscriptions : Model -> Sub FrontendMsg
 subscriptions _ =
     Sub.batch
-        [ Time.every moment (\time -> FEGameMsg (FrameTick time))
-        , subscribeToKeyPresses
+        [ 
+            --Time.every moment (\time -> FEGameMsg (FrameTick time)),
+        subscribeToKeyPresses
         ]
 
 
 init : Url.Url -> Nav.Key -> ( Model, Cmd FrontendMsg )
 init url key =
     ( { key = key
-      , gameState = initState 0
       , gameCount = 0
       , pewsPewed = 0
       , chatInput = ""
       , trollbox = []
+      , gameState = GameLoop.initState 0 "_" "_"
       }
-    , L.sendToBackend NewGameStarted
+    , L.sendToBackend StartNewGame 
     )
 
 
@@ -80,17 +80,18 @@ update msg model =
             ( model, Cmd.none )
 
         FEGameMsg gameMsg ->
-            let
-                ( newGameState, cmd ) =
-                    model.gameState |> GameLoop.updateGame gameMsg
+            -- let
+            --     ( newGameState, cmd ) =
+            --         model.gameState |> GameLoop.updateGame gameMsg
 
-                newModel =
-                    { model | gameState = newGameState }
-            in
-            ( newModel, cmd )
+            --     newModel =
+            --         { model | gameState = newGameState }
+            -- in
+            -- ( newModel, cmd )
+            ( model, L.sendToBackend (SubmitCommand gameMsg) )
 
         NewGame ->
-            ( { model | gameState = initState model.gameCount }, L.sendToBackend NewGameStarted )
+            ( model, L.sendToBackend StartNewGame )
 
         SendChat ->
             ( { model | chatInput = "" }
@@ -107,7 +108,7 @@ updateFromBackend msg model =
         NoOpToFrontend ->
             ( model, Cmd.none )
 
-        GlobalUpdate global ->
+        UpdateGlobal global ->
             ( { model
                 | gameCount = global.gameCount
                 , pewsPewed = global.pewsPewed
@@ -115,6 +116,9 @@ updateFromBackend msg model =
               }
             , Cmd.none
             )
+
+        UpdateGameState gameState ->
+            ( { model | gameState = gameState }, Cmd.none )
 
 
 view : Model -> Browser.Document FrontendMsg
@@ -177,54 +181,6 @@ htmlGameMsg : Html GameMsg -> Html FrontendMsg
 htmlGameMsg =
     Html.map gameMsgToFrontendMsg
 
-
-initState : Int -> GameState
-initState gameCount =
-    { bodies =
-        [ { id = 1
-          , mass = 100000000000
-          , position = { x = 600, y = 350 }
-          , velocity = { x = 0, y = 0 }
-          , radius = 50
-          , bodyType = Planet { gravity = 9.8 }
-          }
-        , { id = 2
-          , mass = 50
-          , position = { x = 100, y = 100 }
-          , velocity = { x = 0, y = 0 }
-          , radius = 50
-          , bodyType =
-                Ship
-                    { rotation = 0
-                    , propulsion = Newtonian { thrust = 1 }
-                    , rotationSpeed = 0.1
-                    , projectile = Kenetic { damage = 1, lifetime = 1000, initialSpeed = 1, hit = False }
-                    , maxCrew = 30
-                    , crew = 30
-                    }
-          }
-        , { id = 3
-          , mass = 50
-          , position = { x = 700, y = 500 }
-          , velocity = { x = 0, y = 0 }
-          , radius = 32
-          , bodyType =
-                Ship
-                    { rotation = 0
-                    , propulsion = LittleGrayMenTech { movementIncrement = 20 }
-                    , rotationSpeed = tau / 32
-                    , projectile = Kenetic { damage = 1, lifetime = 1000, initialSpeed = 1, hit = False }
-                    , maxCrew = 10
-                    , crew = 10
-                    }
-          }
-        ]
-            |> Table.fromList
-    , timeElapsed = 0
-    , space = { width = 1200, height = 700 }
-    , entropyCount = gameCount
-    , depressedKeys = Set.empty
-    }
 
 
 listOfBodies model =

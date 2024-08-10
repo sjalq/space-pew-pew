@@ -1,7 +1,10 @@
 module Backend exposing (..)
 
+import Dict
+import GameLoop
 import L
 import Lamdera exposing (ClientId, SessionId)
+import Table
 import Time
 import Types exposing (..)
 
@@ -21,15 +24,27 @@ app =
 
 subscriptions : Model -> Sub BackendMsg
 subscriptions model =
-    -- Sub.batch
-    --     [ Time.every moment (\time -> BEGameMsg (FrameTick time))
-    --     ]
-    Sub.none
+    []
+        ++ (model.gameStates
+                --|> Table.filter (\gameState -> gameState.id == "0")
+                |> Table.values
+                |> List.map (\gameState -> Time.every moment (\time -> BEGameMsg gameState.id (FrameTick time)))
+           )
+        |> Sub.batch
+
+
+
+--Sub.none
 
 
 init : ( Model, Cmd BackendMsg )
 init =
-    ( { gameCount = 0, pewsPewed = 0, trollbox = [] }
+    ( { gameCount = 0
+      , pewsPewed = 0
+      , trollbox = []
+      , gameStates = Table.empty
+      , clientCurrentGames = Dict.empty
+      }
     , Cmd.none
     )
 
@@ -53,7 +68,7 @@ update msg model =
             in
             ( newModel
             , L.broadcast
-                (GlobalUpdate
+                (UpdateGlobal
                     { gameCount = newModel.gameCount
                     , pewsPewed = newModel.pewsPewed
                     , trollbox = newModel.trollbox
@@ -61,8 +76,30 @@ update msg model =
                 )
             )
 
-        BEGameMsg msg_ ->
-            ( model, Cmd.none )
+        BEGameMsg gameId msg_ ->
+            let
+                newGameState =
+                    Table.get gameId model.gameStates
+                        |> Maybe.map (GameLoop.updateGame msg_)
+            in
+            case newGameState of
+                Just ( gameState, gameCmds ) ->
+                    if gameState.id /= 0 then
+                        ( { model
+                            | gameStates = Table.insert gameState model.gameStates
+                          }
+                        , Cmd.batch
+                            [ gameCmds
+                            , L.sendToFrontend gameState.player1Id (UpdateGameState gameState)
+                            , L.sendToFrontend gameState.player2Id (UpdateGameState gameState)
+                            ]
+                        )
+
+                    else
+                        ( model, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
 
 updateFromFrontend : SessionId -> ClientId -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
@@ -71,19 +108,35 @@ updateFromFrontend sessionId clientId msg model =
         NoOpToBackend ->
             ( model, Cmd.none )
 
-        NewGameStarted ->
+        StartNewGame ->
             let
+                newGameCount =
+                    model.gameCount + 1
+
+                initState =
+                    GameLoop.initState newGameCount clientId clientId
+
+                ( newId, newGameStates ) =
+                    model.gameStates |> Table.insertReturningID initState
+
                 newModel =
-                    { model | gameCount = model.gameCount + 1 }
+                    { model
+                        | gameCount = newGameCount
+                        , clientCurrentGames = model.clientCurrentGames |> Dict.insert clientId newId
+                        , gameStates = newGameStates
+                    }
             in
             ( newModel
-            , L.broadcast
-                (GlobalUpdate
-                    { gameCount = newModel.gameCount
-                    , pewsPewed = newModel.pewsPewed
-                    , trollbox = model.trollbox
-                    }
-                )
+            , Cmd.batch
+                [ L.broadcast
+                    (UpdateGlobal
+                        { gameCount = newModel.gameCount
+                        , pewsPewed = newModel.pewsPewed
+                        , trollbox = model.trollbox
+                        }
+                    )
+                , L.sendToFrontend clientId (UpdateGameState initState)
+                ]
             )
 
         PewPewed ->
@@ -93,7 +146,7 @@ updateFromFrontend sessionId clientId msg model =
             in
             ( newModel
             , L.broadcast
-                (GlobalUpdate
+                (UpdateGlobal
                     { gameCount = newModel.gameCount
                     , pewsPewed = newModel.pewsPewed
                     , trollbox = model.trollbox
@@ -103,3 +156,16 @@ updateFromFrontend sessionId clientId msg model =
 
         AddChat message ->
             ( model, L.performWithTime (AddChatWithTime sessionId message) )
+
+        SubmitCommand gameMsg ->
+            let
+                _ =
+                    Debug.log "games__" (model.clientCurrentGames |> Dict.size)
+
+                gameCmds =
+                    model.clientCurrentGames
+                        |> Dict.get clientId
+                        |> Maybe.map (\gameId -> BEGameMsg gameId gameMsg |> L.performNow)
+                        |> Maybe.withDefault Cmd.none
+            in
+            ( model, gameCmds )

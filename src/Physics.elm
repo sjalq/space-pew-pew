@@ -159,7 +159,6 @@ gravitationalForce bodyA bodyB =
 
         distance_ =
             magnitudeV distanceVector
-                |> Debug.log "distance__"
 
         forceMagnitude =
             if distance_ == 0 then
@@ -182,7 +181,7 @@ applyGravityToAll bodies =
                 |> List.foldl addV { x = 0, y = 0 }
 
         newBody body =
-            body |> applyForce (forceOnBody body) |> Debug.log "newBody__"
+            body |> applyForce (forceOnBody body) 
     in
     Table.map newBody bodies
 
@@ -308,9 +307,6 @@ collide bodyA bodyB =
     in
     if collision then
         let
-            _ =
-                Debug.log "collision" ( bodyA.id, bodyB.id )
-
             normal =
                 Vector2D
                     (bodyB.position.x - bodyA.position.x)
