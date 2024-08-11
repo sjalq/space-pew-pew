@@ -28,6 +28,7 @@ broadcast =
     Lamdera.broadcast
 
 
+-- this is very likely an anti-pattern
 performNow : msg -> Cmd msg
 performNow msg_ =
     Task.perform identity (Task.succeed msg_)
