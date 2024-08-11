@@ -19,19 +19,24 @@ type alias FrontendModel =
     , gameState : GameState
     , lastPing : Time.Posix
     , lastPong : Time.Posix
-    , pingTime : Int
     , emaPingTime : Float
     , depressedKeys : Set String
     }
 
 
 type alias BackendModel =
-    { gameCount : Int
-    , pewsPewed : Int
-    , trollbox : List ChatMessage
+    { globalFun : GlobalFun
     , gameStates : Table GameState
     , clientCurrentGames : Dict ClientId GameId
     , lastSeen : Dict ClientId Time.Posix
+    }
+
+
+type alias GlobalFun =
+    { gameCount : Int
+    , pewsPewed : Int
+    , trollbox : List ChatMessage
+    , totalLiveGames : Int
     }
 
 
@@ -60,7 +65,6 @@ type ToBackend
     | StartNewGame
     | PewPewed
     | AddChat String
-    | SubmitInput InputMsg
     | PingBackend Time.Posix
     | SubmitGameMsgs (List GameMsg)
 
@@ -71,13 +75,12 @@ type BackendMsg
     | AddChatWithTime SessionId String Time.Posix
     | Tick Time.Posix
     | UpdateClients Time.Posix
-    | Disconnect ClientId SessionId 
+    | Disconnect ClientId SessionId
     | ClearOldClients Time.Posix
-
 
 type ToFrontend
     = NoOpToFrontend
-    | UpdateGlobal { gameCount : Int, pewsPewed : Int, trollbox : List ChatMessage }
+    | UpdateGlobal GlobalFun
     | UpdateGameState GameState
     | Pong
 

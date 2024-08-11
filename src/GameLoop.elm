@@ -4,13 +4,21 @@ import L exposing (..)
 import Lamdera exposing (ClientId)
 import Physics exposing (..)
 import Set exposing (Set)
-import Table exposing (Table)
+import Table
 import Types exposing (..)
 
 
-rotationAt60Fps = 0.1
-lgmAt60Fps = 1
-thrustAt60Fps = 1
+rotationAt60Fps =
+    0.1
+
+
+lgmAt60Fps =
+    1
+
+
+thrustAt60Fps =
+    1
+
 
 initState : Int -> ClientId -> ClientId -> GameState
 initState gameCount player1 player2 =
@@ -63,33 +71,16 @@ initState gameCount player1 player2 =
     }
 
 
-updateInputs : InputMsg -> Set String -> Set String
-updateInputs msg_ depressedKeys =
-    case msg_ of
-        KeyPressed key ->
-            Set.insert (String.toLower key) depressedKeys
-
-        KeyReleased key ->
-            Set.remove (String.toLower key) depressedKeys
-
-
-gameMsgs : Set String -> List GameMsg
-gameMsgs depressedKeys =
-    depressedKeys
-        |> Set.toList
-        |> List.map keyToMsg
-
-
 updateMsg : GameMsg -> GameState -> GameState
 updateMsg msg gameState =
     case msg of
         NoAction ->
             gameState
 
-        FrameTick depressedKeys time ->
+        FrameTick depressedKeys _ ->
             let
                 gameState_commandsApplied =
-                    updateMsgs (gameMsgs depressedKeys) gameState
+                    updateMsgs (keysToGameMsgs depressedKeys) gameState
 
                 newBodies =
                     gameState_commandsApplied.bodies
@@ -160,6 +151,23 @@ updateMsg msg gameState =
 updateMsgs : List GameMsg -> GameState -> GameState
 updateMsgs msgs gameState =
     List.foldl updateMsg gameState msgs
+
+
+updateInputs : InputMsg -> Set String -> Set String
+updateInputs msg_ depressedKeys =
+    case msg_ of
+        KeyPressed key ->
+            Set.insert (String.toLower key) depressedKeys
+
+        KeyReleased key ->
+            Set.remove (String.toLower key) depressedKeys
+
+
+keysToGameMsgs : Set String -> List GameMsg
+keysToGameMsgs depressedKeys =
+    depressedKeys
+        |> Set.toList
+        |> List.map keyToMsg
 
 
 keyToMsg : String -> GameMsg

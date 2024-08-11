@@ -3,7 +3,7 @@ module Frontend exposing (..)
 import Browser exposing (UrlRequest(..))
 import Browser.Events
 import Browser.Navigation as Nav
-import GameLoop exposing (keyToMsg)
+import GameLoop 
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events
@@ -14,7 +14,6 @@ import Physics exposing (..)
 import RenderSvg exposing (renderGame)
 import Set
 import Svg exposing (..)
-import Table exposing (insertMaybe)
 import Time
 import Types exposing (..)
 import Url
@@ -56,7 +55,7 @@ keySubs =
 
 
 init : Url.Url -> Nav.Key -> ( Model, Cmd FrontendMsg )
-init url key =
+init _ key =
     ( { key = key
       , gameCount = 0
       , pewsPewed = 0
@@ -65,7 +64,6 @@ init url key =
       , gameState = GameLoop.initState 0 "_" "_"
       , lastPing = Time.millisToPosix 0
       , lastPong = Time.millisToPosix 0
-      , pingTime = 0
       , emaPingTime = 0
       , depressedKeys = Set.empty
       }
@@ -88,7 +86,7 @@ update msg model =
                     , Nav.load url
                     )
 
-        UrlChanged url ->
+        UrlChanged _ ->
             ( model, Cmd.none )
 
         NoOpFrontendMsg ->
@@ -97,10 +95,9 @@ update msg model =
         Input inputMsg ->
             let
                 newModel =
-                    { model | depressedKeys = model.depressedKeys|> GameLoop.updateInputs inputMsg  }
+                    { model | depressedKeys = model.depressedKeys |> GameLoop.updateInputs inputMsg }
             in
             ( newModel, Cmd.none )
-            
 
         NewGame ->
             ( model, L.sendToBackend StartNewGame )
@@ -124,32 +121,28 @@ update msg model =
                 pong =
                     time |> Time.posixToMillis
 
+                pingTime =
+                    pong - ping
+
                 newModel =
-                    { model | lastPong = time, pingTime = pong - ping }
-
-                newModel_ =
-                    if (pong - ping) > 0 then
-                        { newModel | pingTime = pong - ping }
-
-                    else
-                        newModel
-
-                newModel__ =
-                    { newModel_ | emaPingTime = (0.5 * (newModel_.pingTime |> toFloat)) + (0.5 * newModel_.emaPingTime) }
+                    { model
+                        | lastPong = time
+                        , emaPingTime = (0.5 * (pingTime |> toFloat)) + (0.5 * model.emaPingTime)
+                    }
             in
-            ( { newModel__ | lastPong = time }, Cmd.none )
+            ( { newModel | lastPong = time }, Cmd.none )
 
-        UpdateGame time ->
+        UpdateGame _ ->
             let
                 gameMsgs =
-                    model.depressedKeys |> GameLoop.gameMsgs
+                    model.depressedKeys |> GameLoop.keysToGameMsgs
             in
             ( model
-            --     { model
-            --     | gameState =
-            --         model.gameState
-            --             |> GameLoop.updateMsg (FrameTick model.depressedKeys time)
-            --   }
+              --     { model
+              --     | gameState =
+              --         model.gameState
+              --             |> GameLoop.updateMsg (FrameTick model.depressedKeys time)
+              --   }
             , L.sendToBackend (SubmitGameMsgs gameMsgs)
             )
 
