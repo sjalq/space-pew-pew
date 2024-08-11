@@ -4,10 +4,10 @@ import Dict
 import GameLoop
 import L
 import Lamdera exposing (ClientId, SessionId)
+import Set
 import Table
 import Time
 import Types exposing (..)
-import Set
 
 
 type alias Model =
@@ -28,7 +28,7 @@ subscriptions model =
     Sub.batch
         [ Time.every moment Tick
         , Time.every moment UpdateClients
-        , Lamdera.onDisconnect Disconnect
+        , Time.every 10000 ClearOldClients
         ]
 
 
@@ -44,6 +44,7 @@ init =
       , trollbox = []
       , gameStates = Table.empty
       , clientCurrentGames = Dict.empty
+      , lastSeen = Dict.empty
       }
     , Cmd.none
     )
@@ -127,6 +128,13 @@ update msg model =
             in
             ( newModel, Cmd.none )
 
+        ClearOldClients time ->
+            let
+                newModel =
+                    { model | lastSeen = model.lastSeen |> Dict.filter (\clientId _ -> clientId /= clientId) }
+            in
+            ( newModel, Cmd.none )
+
 
 updateFromFrontend : SessionId -> ClientId -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
 updateFromFrontend sessionId clientId msg model =
@@ -194,16 +202,14 @@ updateFromFrontend sessionId clientId msg model =
             --                         |> Table.get gameId
             --                         |> Maybe.map (GameLoop.updateInputs gameMsg)
             --                 )
-
             --     newGameStates =
             --         Table.insertMaybe newSpecificGameState model.gameStates
-
             --     newModel =
             --         { model | gameStates = newGameStates }
             -- in
             ( model, Cmd.none )
 
-        SumbitGameMsgs gameMsgs ->
+        SubmitGameMsgs gameMsgs ->
             let
                 newSpecificGameState =
                     model.clientCurrentGames
@@ -220,9 +226,12 @@ updateFromFrontend sessionId clientId msg model =
 
                 newModel =
                     { model | gameStates = newGameStates }
-
             in
             ( newModel, Cmd.none )
 
-        PingBackend ->
-            ( model, L.sendToFrontend clientId Pong )
+        PingBackend time ->
+            let
+                newModel =
+                    { model | lastSeen = model.lastSeen |> Dict.insert clientId time }
+            in
+            ( newModel, L.sendToFrontend clientId Pong )

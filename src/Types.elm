@@ -31,6 +31,7 @@ type alias BackendModel =
     , trollbox : List ChatMessage
     , gameStates : Table GameState
     , clientCurrentGames : Dict ClientId GameId
+    , lastSeen : Dict ClientId Time.Posix
     }
 
 
@@ -60,8 +61,8 @@ type ToBackend
     | PewPewed
     | AddChat String
     | SubmitInput InputMsg
-    | PingBackend
-    | SumbitGameMsgs (List GameMsg)
+    | PingBackend Time.Posix
+    | SubmitGameMsgs (List GameMsg)
 
 
 type BackendMsg
@@ -71,6 +72,7 @@ type BackendMsg
     | Tick Time.Posix
     | UpdateClients Time.Posix
     | Disconnect ClientId SessionId 
+    | ClearOldClients Time.Posix
 
 
 type ToFrontend
@@ -178,7 +180,7 @@ type InputMsg
 
 fps : Float
 fps =
-    60
+    24
 
 
 moment : Float

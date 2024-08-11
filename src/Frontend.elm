@@ -114,7 +114,7 @@ update msg model =
             ( { model | chatInput = newInput }, Cmd.none )
 
         Ping time ->
-            ( { model | lastPing = time }, L.sendToBackend PingBackend )
+            ( { model | lastPing = time }, L.sendToBackend (PingBackend time) )
 
         PongWithTime time ->
             let
@@ -150,7 +150,7 @@ update msg model =
             --         model.gameState
             --             |> GameLoop.updateMsg (FrameTick model.depressedKeys time)
             --   }
-            , L.sendToBackend (SumbitGameMsgs gameMsgs)
+            , L.sendToBackend (SubmitGameMsgs gameMsgs)
             )
 
 
