@@ -17,6 +17,11 @@ type alias FrontendModel =
     , chatInput : String
     , trollbox : List ChatMessage
     , gameState : GameState
+    , lastPing : Time.Posix
+    , lastPong : Time.Posix
+    , pingTime : Int
+    , emaPingTime : Float
+    , depressedKeys : Set String
     }
 
 
@@ -40,10 +45,13 @@ type FrontendMsg
     = UrlClicked UrlRequest
     | UrlChanged Url
     | NoOpFrontendMsg
-    | FEGameMsg GameMsg
+    | Input InputMsg
+    | UpdateGame Time.Posix
     | NewGame
     | SendChat
     | ChatInputChanged String
+    | Ping Time.Posix
+    | PongWithTime Time.Posix
 
 
 type ToBackend
@@ -51,19 +59,25 @@ type ToBackend
     | StartNewGame
     | PewPewed
     | AddChat String
-    | SubmitCommand GameMsg
+    | SubmitInput InputMsg
+    | PingBackend
+    | SumbitGameMsgs (List GameMsg)
 
 
 type BackendMsg
-    = NoOpBackendMsg 
+    = NoOpBackendMsg
     | BEGameMsg GameId GameMsg
     | AddChatWithTime SessionId String Time.Posix
+    | Tick Time.Posix
+    | UpdateClients Time.Posix
+    | Disconnect ClientId SessionId 
 
 
 type ToFrontend
     = NoOpToFrontend
     | UpdateGlobal { gameCount : Int, pewsPewed : Int, trollbox : List ChatMessage }
     | UpdateGameState GameState
+    | Pong
 
 
 
@@ -128,7 +142,6 @@ type alias GameState =
     , timeElapsed : Float
     , space : Space
     , entropyCount : Int
-    , depressedKeys : Set String
     , player1Id : ClientId
     , player2Id : ClientId
     }
@@ -151,14 +164,23 @@ type Direction
 
 type GameMsg
     = NoAction
-    | FrameTick Time.Posix
+    | FrameTick (Set String) Time.Posix
+      -- These are actions that have happened
     | FireProjectile Int
     | Rotate Direction Int
     | Propel Int
-    | KeyPressed String
+
+
+type InputMsg
+    = KeyPressed String
     | KeyReleased String
+
+
+fps : Float
+fps =
+    60
 
 
 moment : Float
 moment =
-    1000 / 24
+    1000 / fps

@@ -3,7 +3,7 @@ module Frontend exposing (..)
 import Browser exposing (UrlRequest(..))
 import Browser.Events
 import Browser.Navigation as Nav
-import GameLoop
+import GameLoop exposing (keyToMsg)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events
@@ -15,7 +15,7 @@ import RenderSvg exposing (renderGame)
 import Set
 import Svg exposing (..)
 import Table exposing (insertMaybe)
-import GameLoop
+import Time
 import Types exposing (..)
 import Url
 
@@ -39,9 +39,19 @@ app =
 subscriptions : Model -> Sub FrontendMsg
 subscriptions _ =
     Sub.batch
-        [ 
-            --Time.every moment (\time -> FEGameMsg (FrameTick time)),
-        subscribeToKeyPresses
+        [ keySubs
+        , Time.every 1000 Ping
+        , Time.every moment UpdateGame
+        ]
+
+
+keySubs : Sub FrontendMsg
+keySubs =
+    Sub.batch
+        [ Browser.Events.onKeyDown (Decode.map KeyPressed keyDecoder)
+            |> Sub.map Input
+        , Browser.Events.onKeyUp (Decode.map KeyReleased keyDecoder)
+            |> Sub.map Input
         ]
 
 
@@ -53,8 +63,13 @@ init url key =
       , chatInput = ""
       , trollbox = []
       , gameState = GameLoop.initState 0 "_" "_"
+      , lastPing = Time.millisToPosix 0
+      , lastPong = Time.millisToPosix 0
+      , pingTime = 0
+      , emaPingTime = 0
+      , depressedKeys = Set.empty
       }
-    , L.sendToBackend StartNewGame 
+    , L.sendToBackend StartNewGame
     )
 
 
@@ -79,16 +94,13 @@ update msg model =
         NoOpFrontendMsg ->
             ( model, Cmd.none )
 
-        FEGameMsg gameMsg ->
-            -- let
-            --     ( newGameState, cmd ) =
-            --         model.gameState |> GameLoop.updateGame gameMsg
-
-            --     newModel =
-            --         { model | gameState = newGameState }
-            -- in
-            -- ( newModel, cmd )
-            ( model, L.sendToBackend (SubmitCommand gameMsg) )
+        Input inputMsg ->
+            let
+                newModel =
+                    { model | depressedKeys = model.depressedKeys|> GameLoop.updateInputs inputMsg  }
+            in
+            ( newModel, Cmd.none )
+            
 
         NewGame ->
             ( model, L.sendToBackend StartNewGame )
@@ -100,6 +112,46 @@ update msg model =
 
         ChatInputChanged newInput ->
             ( { model | chatInput = newInput }, Cmd.none )
+
+        Ping time ->
+            ( { model | lastPing = time }, L.sendToBackend PingBackend )
+
+        PongWithTime time ->
+            let
+                ping =
+                    model.lastPing |> Time.posixToMillis
+
+                pong =
+                    time |> Time.posixToMillis
+
+                newModel =
+                    { model | lastPong = time, pingTime = pong - ping }
+
+                newModel_ =
+                    if (pong - ping) > 0 then
+                        { newModel | pingTime = pong - ping }
+
+                    else
+                        newModel
+
+                newModel__ =
+                    { newModel_ | emaPingTime = (0.5 * (newModel_.pingTime |> toFloat)) + (0.5 * newModel_.emaPingTime) }
+            in
+            ( { newModel__ | lastPong = time }, Cmd.none )
+
+        UpdateGame time ->
+            let
+                gameMsgs =
+                    model.depressedKeys |> GameLoop.gameMsgs
+            in
+            ( model
+            --     { model
+            --     | gameState =
+            --         model.gameState
+            --             |> GameLoop.updateMsg (FrameTick model.depressedKeys time)
+            --   }
+            , L.sendToBackend (SumbitGameMsgs gameMsgs)
+            )
 
 
 updateFromBackend : ToFrontend -> Model -> ( Model, Cmd FrontendMsg )
@@ -119,6 +171,9 @@ updateFromBackend msg model =
 
         UpdateGameState gameState ->
             ( { model | gameState = gameState }, Cmd.none )
+
+        Pong ->
+            ( model, L.performWithTime PongWithTime )
 
 
 view : Model -> Browser.Document FrontendMsg
@@ -166,35 +221,21 @@ view model =
                 [ Html.text ("Game Count: " ++ String.fromInt model.gameCount)
                 , Html.br [] []
                 , Html.text ("Pews Pewed: " ++ String.fromInt model.pewsPewed)
+                , Html.br [] []
+                , Html.text ("Ping Time : " ++ (model.emaPingTime |> round |> String.fromInt))
                 ]
             ]
         ]
     }
 
 
-gameMsgToFrontendMsg : GameMsg -> FrontendMsg
-gameMsgToFrontendMsg msg =
-    FEGameMsg msg
-
-
-htmlGameMsg : Html GameMsg -> Html FrontendMsg
+htmlGameMsg : Html InputMsg -> Html FrontendMsg
 htmlGameMsg =
-    Html.map gameMsgToFrontendMsg
-
+    Html.map Input
 
 
 listOfBodies model =
     model.gameState.ships ++ model.gameState.projectiles
-
-
-subscribeToKeyPresses : Sub FrontendMsg
-subscribeToKeyPresses =
-    Sub.batch
-        [ Browser.Events.onKeyDown (Decode.map KeyPressed keyDecoder)
-            |> Sub.map FEGameMsg
-        , Browser.Events.onKeyUp (Decode.map KeyReleased keyDecoder)
-            |> Sub.map FEGameMsg
-        ]
 
 
 keyDecoder : Decode.Decoder String
@@ -202,12 +243,12 @@ keyDecoder =
     Decode.field "key" Decode.string
 
 
-keyPressed : String -> GameMsg
+keyPressed : String -> InputMsg
 keyPressed key =
     KeyPressed key
 
 
-keyReleased : String -> GameMsg
+keyReleased : String -> InputMsg
 keyReleased key =
     KeyReleased key
 
@@ -216,7 +257,7 @@ drawKey : String -> String -> String -> Model -> Html msg
 drawKey icon key action model =
     let
         isPressed =
-            Set.member (String.toLower key) model.gameState.depressedKeys
+            Set.member (String.toLower key) model.depressedKeys
     in
     div [ Attr.style "margin-bottom" "10px" ]
         [ div

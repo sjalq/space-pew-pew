@@ -8,6 +8,10 @@ import Table exposing (Table)
 import Types exposing (..)
 
 
+rotationAt60Fps = 0.1
+lgmAt60Fps = 1
+thrustAt60Fps = 1
+
 initState : Int -> ClientId -> ClientId -> GameState
 initState gameCount player1 player2 =
     { id = 0
@@ -30,7 +34,7 @@ initState gameCount player1 player2 =
                 Ship
                     { rotation = 0
                     , propulsion = Newtonian { thrust = 1 }
-                    , rotationSpeed = 0.1
+                    , rotationSpeed = 0.1 -- 0.1 is what feels nice at 60fps. so at 24 fps that would be...4
                     , projectile = Kenetic { damage = 1, lifetime = 1000, initialSpeed = 1, hit = False }
                     , maxCrew = 30
                     , crew = 30
@@ -54,22 +58,41 @@ initState gameCount player1 player2 =
         ]
             |> Table.fromList
     , timeElapsed = 0
-    , space = { width = 1200, height = 700 }
+    , space = { width = 1200, height = 600 }
     , entropyCount = gameCount
-    , depressedKeys = Set.empty
     }
 
 
-updateGame : GameMsg -> GameState -> ( GameState, Cmd BackendMsg )
-updateGame msg gameState =
+updateInputs : InputMsg -> Set String -> Set String
+updateInputs msg_ depressedKeys =
+    case msg_ of
+        KeyPressed key ->
+            Set.insert (String.toLower key) depressedKeys
+
+        KeyReleased key ->
+            Set.remove (String.toLower key) depressedKeys
+
+
+gameMsgs : Set String -> List GameMsg
+gameMsgs depressedKeys =
+    depressedKeys
+        |> Set.toList
+        |> List.map keyToMsg
+
+
+updateMsg : GameMsg -> GameState -> GameState
+updateMsg msg gameState =
     case msg of
         NoAction ->
-            ( gameState, Cmd.none )
+            gameState
 
-        FrameTick time ->
+        FrameTick depressedKeys time ->
             let
+                gameState_commandsApplied =
+                    updateMsgs (gameMsgs depressedKeys) gameState
+
                 newBodies =
-                    gameState.bodies
+                    gameState_commandsApplied.bodies
                         |> applyGravityToAll
                         |> updateLifetimes
                         |> Table.map (\body -> applyVelocity gameState.space body)
@@ -84,18 +107,8 @@ updateGame msg gameState =
                         | bodies = finalBodies
                         , timeElapsed = gameState.timeElapsed + moment
                     }
-
-                performKeys =
-                    gameState.depressedKeys
-                        |> Set.toList
-                        |> List.map keyToMsg
-                        |> List.map (BEGameMsg gameState.id)
-                        |> List.map performNow
-                        |> Cmd.batch
             in
-            ( newGameState
-            , performKeys
-            )
+            newGameState
 
         FireProjectile shipId ->
             let
@@ -115,7 +128,7 @@ updateGame msg gameState =
                 newState =
                     { gameState | bodies = newBodies }
             in
-            ( newState, L.sendToBackend PewPewed )
+            newState
 
         Rotate direction bodyId ->
             let
@@ -124,13 +137,11 @@ updateGame msg gameState =
                         |> Table.get bodyId
                         |> Maybe.map (rotate direction)
             in
-            ( { gameState
+            { gameState
                 | bodies =
                     gameState.bodies
                         |> Table.insertMaybe ship
-              }
-            , Cmd.none
-            )
+            }
 
         Propel bodyId ->
             let
@@ -139,19 +150,16 @@ updateGame msg gameState =
                         |> Table.get bodyId
                         |> Maybe.map ship_propel
             in
-            ( { gameState
+            { gameState
                 | bodies =
                     gameState.bodies
                         |> Table.insertMaybe bodyToAccelerate
-              }
-            , Cmd.none
-            )
+            }
 
-        KeyPressed key ->
-            ( { gameState | depressedKeys = Set.insert (String.toLower key) gameState.depressedKeys }, Cmd.none )
 
-        KeyReleased key ->
-            ( { gameState | depressedKeys = Set.remove (String.toLower key) gameState.depressedKeys }, Cmd.none )
+updateMsgs : List GameMsg -> GameState -> GameState
+updateMsgs msgs gameState =
+    List.foldl updateMsg gameState msgs
 
 
 keyToMsg : String -> GameMsg

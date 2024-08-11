@@ -181,7 +181,7 @@ applyGravityToAll bodies =
                 |> List.foldl addV { x = 0, y = 0 }
 
         newBody body =
-            body |> applyForce (forceOnBody body) 
+            body |> applyForce (forceOnBody body)
     in
     Table.map newBody bodies
 
@@ -355,38 +355,34 @@ collide bodyA bodyB =
 
             correctedPositionB =
                 addV bodyB.position correctionVectorB
-
-            bodyA_ =
-                { bodyA | position = correctedPositionA }
-
-            bodyB_ =
-                { bodyB | position = correctedPositionB }
         in
         case ( body_isNewtonian bodyA, body_isNewtonian bodyB ) of
             ( True, True ) ->
                 ( True
-                , [ { bodyA_ | velocity = newVelocityA }
-                  , { bodyB_ | velocity = newVelocityB }
+                , [ { bodyA | position = correctedPositionA, velocity = newVelocityA }
+                  , { bodyB | position = correctedPositionB, velocity = newVelocityB }
                   ]
                 )
 
             ( True, False ) ->
                 ( True
-                , [ { bodyA_ | velocity = addV newVelocityA (invertV newVelocityB) }
-                  , bodyB_
+                , [ { bodyA | velocity = addV newVelocityA (invertV newVelocityB) }
+                  , { bodyB | position = addV bodyB.position (scaleV overlapDistance normal) }
                   ]
                 )
 
             ( False, True ) ->
                 ( True
-                , [ { bodyB_ | velocity = addV newVelocityB (invertV newVelocityA) }
-                  , bodyA_
+                , [ { bodyB | velocity = addV newVelocityB (invertV newVelocityA) }
+                  , { bodyA | position = addV bodyA.position (scaleV overlapDistance normal) }
                   ]
                 )
 
             _ ->
                 ( True
-                , [ bodyA_, bodyB_ ]
+                , [ { bodyA | position = correctedPositionA }
+                  , { bodyB | position = correctedPositionB }
+                  ]
                 )
 
     else

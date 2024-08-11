@@ -7,6 +7,7 @@ import Lamdera exposing (ClientId, SessionId)
 import Table
 import Time
 import Types exposing (..)
+import Set
 
 
 type alias Model =
@@ -24,16 +25,15 @@ app =
 
 subscriptions : Model -> Sub BackendMsg
 subscriptions model =
-    []
-        ++ (model.gameStates
-                --|> Table.filter (\gameState -> gameState.id == "0")
-                |> Table.values
-                |> List.map (\gameState -> Time.every moment (\time -> BEGameMsg gameState.id (FrameTick time)))
-           )
-        |> Sub.batch
+    Sub.batch
+        [ Time.every moment Tick
+        , Time.every moment UpdateClients
+        , Lamdera.onDisconnect Disconnect
+        ]
 
 
 
+--Sub.none
 --Sub.none
 
 
@@ -80,19 +80,15 @@ update msg model =
             let
                 newGameState =
                     Table.get gameId model.gameStates
-                        |> Maybe.map (GameLoop.updateGame msg_)
+                        |> Maybe.map (GameLoop.updateMsg msg_)
             in
             case newGameState of
-                Just ( gameState, gameCmds ) ->
+                Just gameState ->
                     if gameState.id /= 0 then
                         ( { model
                             | gameStates = Table.insert gameState model.gameStates
                           }
-                        , Cmd.batch
-                            [ gameCmds
-                            , L.sendToFrontend gameState.player1Id (UpdateGameState gameState)
-                            , L.sendToFrontend gameState.player2Id (UpdateGameState gameState)
-                            ]
+                        , Cmd.none
                         )
 
                     else
@@ -100,6 +96,36 @@ update msg model =
 
                 Nothing ->
                     ( model, Cmd.none )
+
+        Tick time ->
+            let
+                newGameStates =
+                    model.gameStates
+                        |> Table.map (\gameState -> GameLoop.updateMsg (FrameTick Set.empty time) gameState)
+            in
+            ( { model | gameStates = newGameStates }, Cmd.none )
+
+        UpdateClients time ->
+            let
+                gameCommands =
+                    model.gameStates
+                        |> Table.values
+                        |> List.map
+                            (\gameState ->
+                                Cmd.batch
+                                    [ L.sendToFrontend gameState.player1Id (UpdateGameState gameState)
+                                    , L.sendToFrontend gameState.player2Id (UpdateGameState gameState)
+                                    ]
+                            )
+            in
+            ( model, Cmd.batch gameCommands )
+
+        Disconnect clientId sessionId ->
+            let
+                newModel =
+                    { model | gameStates = Table.filter (\gameState -> gameState.player1Id /= clientId && gameState.player2Id /= clientId) model.gameStates }
+            in
+            ( newModel, Cmd.none )
 
 
 updateFromFrontend : SessionId -> ClientId -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
@@ -157,15 +183,46 @@ updateFromFrontend sessionId clientId msg model =
         AddChat message ->
             ( model, L.performWithTime (AddChatWithTime sessionId message) )
 
-        SubmitCommand gameMsg ->
-            let
-                _ =
-                    Debug.log "games__" (model.clientCurrentGames |> Dict.size)
+        SubmitInput inputMsg ->
+            -- let
+            --     newSpecificGameState =
+            --         model.clientCurrentGames
+            --             |> Dict.get clientId
+            --             |> Maybe.andThen
+            --                 (\gameId ->
+            --                     model.gameStates
+            --                         |> Table.get gameId
+            --                         |> Maybe.map (GameLoop.updateInputs gameMsg)
+            --                 )
 
-                gameCmds =
+            --     newGameStates =
+            --         Table.insertMaybe newSpecificGameState model.gameStates
+
+            --     newModel =
+            --         { model | gameStates = newGameStates }
+            -- in
+            ( model, Cmd.none )
+
+        SumbitGameMsgs gameMsgs ->
+            let
+                newSpecificGameState =
                     model.clientCurrentGames
                         |> Dict.get clientId
-                        |> Maybe.map (\gameId -> BEGameMsg gameId gameMsg |> L.performNow)
-                        |> Maybe.withDefault Cmd.none
+                        |> Maybe.andThen
+                            (\gameId ->
+                                model.gameStates
+                                    |> Table.get gameId
+                                    |> Maybe.map (GameLoop.updateMsgs gameMsgs)
+                            )
+
+                newGameStates =
+                    Table.insertMaybe newSpecificGameState model.gameStates
+
+                newModel =
+                    { model | gameStates = newGameStates }
+
             in
-            ( model, gameCmds )
+            ( newModel, Cmd.none )
+
+        PingBackend ->
+            ( model, L.sendToFrontend clientId Pong )

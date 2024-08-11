@@ -12,7 +12,7 @@ import Types exposing (..)
 -- Rendering functions
 
 
-renderGame : GameState -> Html GameMsg
+renderGame : GameState -> Html InputMsg
 renderGame gameState =
     let
         gameWidth =
@@ -410,7 +410,7 @@ renderHumanShip ship =
         ]
 
 
-drawCrewHealthBar : Vector2D -> Body -> Svg GameMsg
+drawCrewHealthBar : Vector2D -> Body -> Svg InputMsg
 drawCrewHealthBar position ship =
     case ship.bodyType of
         Ship ship_ ->

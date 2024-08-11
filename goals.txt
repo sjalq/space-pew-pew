@@ -32,5 +32,16 @@
 2024-08-09
 ----------
 + Make the Grey's ship behave more grey and look more grey
---
-* Fix key stickiness
++ Fix key stickiness
+
+2024-08-10
+----------
++ Have games resolve on the backend
+
+2024-08-11
+----------
+* Have games resolve on the back and frontends, periodically updating from the backend
+* Make sure there's only the necessary games live of the backend
+* Split FrameTick into "apply Physics and apply Commands"
+* check out Lamdera onConnect and onDisconnect 
+** get to validate the game loop asap
