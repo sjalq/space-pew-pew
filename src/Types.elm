@@ -75,7 +75,6 @@ type BackendMsg
     | AddChatWithTime SessionId String Time.Posix
     | Tick Time.Posix
     | UpdateClients Time.Posix
-    | Disconnect ClientId SessionId
     | ClearOldClients Time.Posix
 
 type ToFrontend

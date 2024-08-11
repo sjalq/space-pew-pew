@@ -124,12 +124,6 @@ update msg model =
             in
             ( model, Cmd.batch gameCommands )
 
-        Disconnect clientId _ ->
-            let
-                newModel =
-                    { model | gameStates = Table.filter (\gameState -> gameState.player1Id /= clientId && gameState.player2Id /= clientId) model.gameStates }
-            in
-            ( newModel, Cmd.none )
 
         ClearOldClients time ->
             let
