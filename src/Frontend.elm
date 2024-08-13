@@ -329,6 +329,6 @@ drawTrollbox model =
 drawChatMessage : ChatMessage -> Html FrontendMsg
 drawChatMessage msg =
     div [ Attr.style "margin-bottom" "5px" ]
-        [ span [ Attr.style "font-weight" "bold" ] [ Html.text (String.left 6 msg.clientId ++ ": ") ]
+        [ span [ Attr.style "font-weight" "bold" ] [ Html.text (String.left 6 msg.browserId ++ ": ") ]
         , Html.text msg.message
         ]

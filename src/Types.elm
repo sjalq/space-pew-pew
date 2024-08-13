@@ -3,11 +3,19 @@ module Types exposing (..)
 import Browser exposing (UrlRequest)
 import Browser.Navigation exposing (Key)
 import Dict exposing (Dict)
-import Lamdera exposing (ClientId, SessionId)
+import Lamdera 
 import Set exposing (Set)
 import Table exposing (Table)
 import Time
 import Url exposing (Url)
+
+
+type alias BrowserId =
+    Lamdera.SessionId
+
+
+type alias ConnectionId =
+    Lamdera.ClientId
 
 
 type alias FrontendModel =
@@ -27,8 +35,8 @@ type alias FrontendModel =
 type alias BackendModel =
     { globalFun : GlobalFun
     , gameStates : Table GameState
-    , clientCurrentGames : Dict ClientId GameId
-    , lastSeen : Dict ClientId Time.Posix
+    , connectionCurrentGames : Dict ConnectionId GameId
+    , lastSeen : Dict ConnectionId Time.Posix
     }
 
 
@@ -42,7 +50,7 @@ type alias GlobalFun =
 
 type alias ChatMessage =
     { timestamp : Time.Posix
-    , clientId : SessionId
+    , browserId : BrowserId
     , message : String
     }
 
@@ -72,10 +80,11 @@ type ToBackend
 type BackendMsg
     = NoOpBackendMsg
     | BEGameMsg GameId GameMsg
-    | AddChatWithTime SessionId String Time.Posix
+    | AddChatWithTime BrowserId String Time.Posix
     | Tick Time.Posix
     | UpdateClients Time.Posix
     | ClearOldClients Time.Posix
+
 
 type ToFrontend
     = NoOpToFrontend
@@ -146,8 +155,8 @@ type alias GameState =
     , timeElapsed : Float
     , space : Space
     , entropyCount : Int
-    , player1Id : ClientId
-    , player2Id : ClientId
+    , player1Id : ConnectionId
+    , player2Id : ConnectionId
     }
 
 

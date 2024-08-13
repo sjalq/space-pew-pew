@@ -3,7 +3,7 @@ module Backend exposing (..)
 import Dict
 import GameLoop
 import L
-import Lamdera exposing (ClientId, SessionId)
+import Lamdera 
 import Set
 import Table
 import Time
@@ -40,7 +40,7 @@ subscriptions _ =
 init : ( Model, Cmd BackendMsg )
 init =
     ( { gameStates = Table.empty
-      , clientCurrentGames = Dict.empty
+      , connectionCurrentGames = Dict.empty
       , lastSeen = Dict.empty
       , globalFun =
             { gameCount = 0
@@ -59,11 +59,11 @@ update msg model =
         NoOpBackendMsg ->
             ( model, Cmd.none )
 
-        AddChatWithTime clientId message time ->
+        AddChatWithTime browserId message time ->
             let
                 chatMessage =
                     { timestamp = time
-                    , clientId = clientId
+                    , browserId = browserId
                     , message = message
                     }
 
@@ -144,12 +144,12 @@ update msg model =
                         )
                         model.lastSeen
 
-                newClientCurrentGames =
+                newConnectionCurrentGames =
                     Dict.filter
                         (\clientId _ ->
                             newLastSeen |> Dict.member clientId
                         )
-                        model.clientCurrentGames
+                        model.connectionCurrentGames
 
                 newGameStates =
                     model.gameStates
@@ -161,15 +161,15 @@ update msg model =
                 newModel =
                     { model
                         | lastSeen = newLastSeen
-                        , clientCurrentGames = newClientCurrentGames
+                        , connectionCurrentGames = newConnectionCurrentGames
                         , gameStates = newGameStates
                     }
             in
             ( newModel, Cmd.none )
 
 
-updateFromFrontend : SessionId -> ClientId -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
-updateFromFrontend sessionId clientId msg model =
+updateFromFrontend : BrowserId -> ConnectionId -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
+updateFromFrontend browserId connectionId msg model =
     case msg of
         NoOpToBackend ->
             ( model, Cmd.none )
@@ -183,22 +183,29 @@ updateFromFrontend sessionId clientId msg model =
                     { oldGlobalFun | gameCount = oldGlobalFun.gameCount + 1 }
 
                 initState =
-                    GameLoop.initState newGlobalFun.gameCount clientId clientId
+                    GameLoop.initState newGlobalFun.gameCount connectionId connectionId
 
                 ( newId, newGameStates ) =
                     model.gameStates |> Table.insertReturningID initState
 
+
+                newConnectionCurrentGames =
+                    model.connectionCurrentGames 
+                        |> Dict.remove connectionId
+                        |> Dict.insert connectionId newId
+
+
                 newModel =
                     { model
                         | globalFun = newGlobalFun
-                        , clientCurrentGames = model.clientCurrentGames |> Dict.insert clientId newId
+                        , connectionCurrentGames = newConnectionCurrentGames
                         , gameStates = newGameStates
                     }
             in
             ( newModel
             , Cmd.batch
                 [ L.broadcast (UpdateGlobal newGlobalFun)
-                , L.sendToFrontend clientId (UpdateGameState initState)
+                , L.sendToFrontend connectionId (UpdateGameState initState)
                 ]
             )
 
@@ -218,13 +225,13 @@ updateFromFrontend sessionId clientId msg model =
             )
 
         AddChat message ->
-            ( model, L.performWithTime (AddChatWithTime sessionId message) )
+            ( model, L.performWithTime (AddChatWithTime browserId message) )
 
         SubmitGameMsgs gameMsgs ->
             let
                 newSpecificGameState =
-                    model.clientCurrentGames
-                        |> Dict.get clientId
+                    model.connectionCurrentGames
+                        |> Dict.get browserId
                         |> Maybe.andThen
                             (\gameId ->
                                 model.gameStates
@@ -243,6 +250,6 @@ updateFromFrontend sessionId clientId msg model =
         PingBackend time ->
             let
                 newModel =
-                    { model | lastSeen = model.lastSeen |> Dict.insert clientId time }
+                    { model | lastSeen = model.lastSeen |> Dict.insert connectionId time }
             in
-            ( newModel, L.sendToFrontend clientId Pong )
+            ( newModel, L.sendToFrontend connectionId Pong )
