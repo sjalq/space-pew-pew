@@ -3,7 +3,7 @@ module Types exposing (..)
 import Browser exposing (UrlRequest)
 import Browser.Navigation exposing (Key)
 import Dict exposing (Dict)
-import Lamdera 
+import Lamdera
 import Set exposing (Set)
 import Table exposing (Table)
 import Time
@@ -79,12 +79,11 @@ type ToBackend
 
 type BackendMsg
     = NoOpBackendMsg
-    | BEGameMsg GameId GameMsg
     | AddChatWithTime BrowserId String Time.Posix
     | Tick Time.Posix
     | UpdateClients Time.Posix
     | ClearOldClients Time.Posix
-
+    | HackPingBackend ConnectionId Time.Posix
 
 type ToFrontend
     = NoOpToFrontend
@@ -191,7 +190,7 @@ type InputMsg
 
 fps : Float
 fps =
-    24
+    60
 
 
 moment : Float

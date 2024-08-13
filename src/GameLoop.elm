@@ -22,7 +22,7 @@ thrustAt60Fps =
 
 initState : Int -> ClientId -> ClientId -> GameState
 initState gameCount player1 player2 =
-    { id = 0
+    { id = -1
     , player1Id = player1
     , player2Id = player2
     , bodies =
@@ -150,6 +150,13 @@ updateMsg msg gameState =
 
 updateMsgs : List GameMsg -> GameState -> GameState
 updateMsgs msgs gameState =
+    let
+        _ =
+            Debug.log "updateMsgs__" msgs
+
+        _ =
+            Debug.log "gameState__" gameState
+    in
     List.foldl updateMsg gameState msgs
 
 

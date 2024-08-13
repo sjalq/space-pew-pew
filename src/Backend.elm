@@ -1,9 +1,10 @@
 module Backend exposing (..)
 
+import DebugApp
 import Dict
 import GameLoop
 import L
-import Lamdera 
+import Lamdera
 import Set
 import Table
 import Time
@@ -14,8 +15,20 @@ type alias Model =
     BackendModel
 
 
+
+-- app =
+--     Lamdera.backend
+--         { init = init
+--         , update = update
+--         , updateFromFrontend = updateFromFrontend
+--         , subscriptions = subscriptions
+--         }
+
+
 app =
-    Lamdera.backend
+    DebugApp.backend
+        NoOpBackendMsg
+        "34aa073d1876eed8"
         { init = init
         , update = update
         , updateFromFrontend = updateFromFrontend
@@ -80,27 +93,6 @@ update msg model =
             , L.broadcast (UpdateGlobal newGlobalFun)
             )
 
-        BEGameMsg gameId msg_ ->
-            let
-                newGameState =
-                    Table.get gameId model.gameStates
-                        |> Maybe.map (GameLoop.updateMsg msg_)
-            in
-            case newGameState of
-                Just gameState ->
-                    if gameState.id /= 0 then
-                        ( { model
-                            | gameStates = Table.insert gameState model.gameStates
-                          }
-                        , Cmd.none
-                        )
-
-                    else
-                        ( model, Cmd.none )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
         Tick time ->
             let
                 newGameStates =
@@ -124,7 +116,6 @@ update msg model =
             in
             ( model, Cmd.batch gameCommands )
 
-
         ClearOldClients time ->
             let
                 -- if time - lastSeen > 60000 then
@@ -134,22 +125,22 @@ update msg model =
                     Time.posixToMillis time
 
                 newLastSeen =
-                    Dict.filter
-                        (\_ lastSeenTime ->
-                            let
-                                timeDiff =
-                                    currentTime - Time.posixToMillis lastSeenTime
-                            in
-                            timeDiff <= 60000
-                        )
-                        model.lastSeen
+                    model.lastSeen
+                        |> Dict.filter
+                            (\_ lastSeenTime ->
+                                let
+                                    timeDiff =
+                                        currentTime - Time.posixToMillis lastSeenTime
+                                in
+                                timeDiff <= 60000
+                            )
 
                 newConnectionCurrentGames =
-                    Dict.filter
-                        (\clientId _ ->
-                            newLastSeen |> Dict.member clientId
-                        )
-                        model.connectionCurrentGames
+                    model.connectionCurrentGames
+                        |> Dict.filter
+                            (\clientId _ ->
+                                newLastSeen |> Dict.member clientId
+                            )
 
                 newGameStates =
                     model.gameStates
@@ -166,6 +157,13 @@ update msg model =
                     }
             in
             ( newModel, Cmd.none )
+
+        HackPingBackend connectionId time ->
+            let
+                newModel =
+                    { model | lastSeen = model.lastSeen |> Dict.insert connectionId time }
+            in
+            ( newModel, Cmd.none)
 
 
 updateFromFrontend : BrowserId -> ConnectionId -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
@@ -186,14 +184,15 @@ updateFromFrontend browserId connectionId msg model =
                     GameLoop.initState newGlobalFun.gameCount connectionId connectionId
 
                 ( newId, newGameStates ) =
-                    model.gameStates |> Table.insertReturningID initState
-
+                    model.gameStates
+                        |> Table.filter
+                            (\gameState -> not (gameState.player1Id == connectionId) || not (gameState.player2Id == connectionId))
+                        |> Table.insertReturningId initState
 
                 newConnectionCurrentGames =
-                    model.connectionCurrentGames 
+                    model.connectionCurrentGames
                         |> Dict.remove connectionId
                         |> Dict.insert connectionId newId
-
 
                 newModel =
                     { model
@@ -206,6 +205,7 @@ updateFromFrontend browserId connectionId msg model =
             , Cmd.batch
                 [ L.broadcast (UpdateGlobal newGlobalFun)
                 , L.sendToFrontend connectionId (UpdateGameState initState)
+                , L.performWithTime (HackPingBackend connectionId)
                 ]
             )
 
@@ -231,7 +231,7 @@ updateFromFrontend browserId connectionId msg model =
             let
                 newSpecificGameState =
                     model.connectionCurrentGames
-                        |> Dict.get browserId
+                        |> Dict.get connectionId
                         |> Maybe.andThen
                             (\gameId ->
                                 model.gameStates
@@ -239,8 +239,12 @@ updateFromFrontend browserId connectionId msg model =
                                     |> Maybe.map (GameLoop.updateMsgs gameMsgs)
                             )
 
+                _ =
+                    Debug.log "newSpecificGameState__" (newSpecificGameState |> Maybe.map .id)
+
                 newGameStates =
-                    Table.insertMaybe newSpecificGameState model.gameStates
+                    model.gameStates
+                        |> Table.insertMaybe newSpecificGameState
 
                 newModel =
                     { model | gameStates = newGameStates }

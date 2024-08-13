@@ -9,12 +9,12 @@ type Table a
 
 empty : Table a
 empty =
-    Table -1 Dict.empty
+    Table 0 Dict.empty
 
 
 nextId : Table a -> Int
 nextId (Table id _) =
-    id + 1
+    id
 
 
 get : Int -> Table a -> Maybe a
@@ -44,35 +44,18 @@ filterMap fn (Table nextId_ table) =
     Table nextId_ newDict
 
 
+insertReturningId record (Table id dict) =
+    if record.id == -1 then
+        ( id, Table (id + 1) (Dict.insert id { record | id = id } dict) )
 
-insertReturningID record (Table id dict) =
-    let
-        id_ =
-            if record.id /= 0 then
-                max id record.id
-            else
-                nextId (Table id dict)
-
-        newTable =
-            if record.id /= 0 then
-                Table id_ (Dict.insert record.id record dict)
-
-            else
-                let
-                    newRecord =
-                        { record | id = id_ }
-                in
-                Table id_ (Dict.insert newRecord.id newRecord dict)
-    in
-    ( id_, newTable )
+    else
+        ( record.id, Table (max id (record.id + 1)) (Dict.insert record.id record dict) )
 
 
 insert record table =
-    insertReturningID record table |> Tuple.second
+    insertReturningId record table |> Tuple.second
 
 
-
-insertMaybe : Maybe { a | id : Int } -> Table { a | id : Int } -> Table { a | id : Int }
 insertMaybe record table =
     record
         |> Maybe.map (\r -> insert r table)
@@ -135,3 +118,7 @@ union (Table nextId1 dict1) (Table nextId2 dict2) =
     in
     Table maxNextId (Dict.union dict1 dict2)
 
+
+size : Table a -> Int
+size (Table _ dict) =
+    Dict.size dict

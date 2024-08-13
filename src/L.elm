@@ -2,7 +2,7 @@ module L exposing (..)
 
 import Lamdera exposing (ClientId)
 import Task
-import Types exposing (ToBackend, ToFrontend)
+import Types exposing (ToBackend, ToFrontend, ConnectionId)
 import Time
 
 
@@ -18,7 +18,7 @@ sendToBackend =
     Lamdera.sendToBackend
 
 
-sendToFrontend : ClientId -> ToFrontend -> Cmd msg
+sendToFrontend : ConnectionId -> ToFrontend -> Cmd msg
 sendToFrontend =
     Lamdera.sendToFrontend
 

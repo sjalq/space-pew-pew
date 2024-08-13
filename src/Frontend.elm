@@ -39,7 +39,7 @@ subscriptions : Model -> Sub FrontendMsg
 subscriptions _ =
     Sub.batch
         [ keySubs
-        , Time.every 1000 Ping
+        , Time.every 10000 Ping
         , Time.every moment UpdateGame
         ]
 
