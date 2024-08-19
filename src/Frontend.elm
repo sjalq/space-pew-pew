@@ -66,6 +66,7 @@ init _ key =
       , lastPong = Time.millisToPosix 0
       , emaPingTime = 0
       , depressedKeys = Set.empty
+      , opponents = []
       }
     , L.sendToBackend StartNewGame
     )
@@ -185,7 +186,14 @@ view model =
         [ Html.div [ Attr.style "text-align" "center", Attr.style "padding-top" "40px" ]
             [ Html.img [ Attr.src "https://lamdera.app/lamdera-logo-black.png", Attr.width 150 ] []
             , Html.div [ Attr.style "display" "flex", Attr.style "justify-content" "space-between" ]
-                [ drawKeyboardLayoutLeft model
+                [ Html.div
+                    [ Attr.style "display" "flex"
+                    , Attr.style "flex-direction" "column"
+                    , Attr.style "align-items" "center"
+                    ]
+                    [ drawKeyboardLayoutLeft model
+                    , drawOpponents model
+                    ]
                 , Html.div
                     [ Attr.style "font-family" "sans-serif"
                     , Attr.style "padding-top" "40px"
@@ -270,8 +278,12 @@ drawKey icon key action model =
 
 drawKeyboardLayoutLeft : Model -> Html FrontendMsg
 drawKeyboardLayoutLeft model =
-    div [ Attr.style "text-align" "center", Attr.style "font-family" "Arial, sans-serif", Attr.style "margin-left" "50px" ]
-        [ h2 [ Attr.style "margin-bottom" "20px" ] [ Html.text "Left Player Controls" ]
+    div
+        [ Attr.style "text-align" "center"
+        , Attr.style "font-family" "Arial, sans-serif"
+        , Attr.style "margin-right" "50px"
+        ]
+        [ h2 [ Attr.style "margin-bottom" "20px", Attr.style "text-align" "right" ] [ Html.text "Left Player Controls" ]
         , div [ Attr.style "display" "flex", Attr.style "justify-content" "center" ]
             [ div [ Attr.style "margin" "10px", Attr.style "text-align" "left" ]
                 [ drawKey "W" "W" "Propel" model
@@ -286,7 +298,11 @@ drawKeyboardLayoutLeft model =
 
 drawKeyboardLayoutRight : Model -> Html FrontendMsg
 drawKeyboardLayoutRight model =
-    div [ Attr.style "text-align" "center", Attr.style "font-family" "Arial, sans-serif", Attr.style "margin-right" "50px" ]
+    div
+        [ Attr.style "text-align" "center"
+        , Attr.style "font-family" "Arial, sans-serif"
+        , Attr.style "margin-right" "50px"
+        ]
         [ h2 [ Attr.style "margin-bottom" "20px" ] [ Html.text "Right Player Controls" ]
         , div [ Attr.style "display" "flex", Attr.style "justify-content" "center" ]
             [ div [ Attr.style "margin" "10px", Attr.style "text-align" "left" ]
@@ -302,7 +318,13 @@ drawKeyboardLayoutRight model =
 
 drawTrollbox : Model -> Html FrontendMsg
 drawTrollbox model =
-    div [ Attr.style "width" "300px", Attr.style "border" "1px solid #ccc", Attr.style "margin" "20px auto" ]
+    div
+        [ Attr.style "width" "300px"
+        , Attr.style "border" "1px solid #ccc"
+        , Attr.style "align-self" "center"
+
+        --, Attr.style "margin" "20px auto"
+        ]
         [ div
             [ Attr.style "height" "300px"
             , Attr.style "overflow-y" "scroll"
@@ -331,4 +353,55 @@ drawChatMessage msg =
     div [ Attr.style "margin-bottom" "5px" ]
         [ span [ Attr.style "font-weight" "bold" ] [ Html.text (String.left 6 msg.browserId ++ ": ") ]
         , Html.text msg.message
+        ]
+
+
+
+-- type alias Opponent =
+--     { id : ConnectionId
+--     , matchState : MatchState
+--     , spectatingGame : Maybe GameId
+--     }
+-- type MatchState
+--     = HangingOut
+--     | InGame GameId
+--     | LookingForGame
+
+
+drawOpponents : Model -> Html FrontendMsg
+drawOpponents model =
+    div [ Attr.style "width" "250px", Attr.style "border" "1px solid #ccc", Attr.style "margin" "20px auto" ]
+        [ div
+            [ Attr.style "height" "300px"
+            , Attr.style "overflow-y" "scroll"
+            , Attr.style "padding" "10px"
+            , Attr.style "background-color" "#f0f0f0"
+            ]
+            (List.map drawOpponent model.opponents)
+        ]
+
+
+drawOpponent : Opponent -> Html FrontendMsg
+drawOpponent opponent =
+    div [ Attr.style "margin-bottom" "5px" ]
+        [ span [ Attr.style "font-weight" "bold" ] [ Html.text (String.left 6 opponent.id ++ " ") ]
+        , span []
+            [ Html.text <|
+                case opponent.matchState of
+                    HangingOut ->
+                        "🏠 Hanging out"
+
+                    InGame gameId ->
+                        "🎮 In game " ++ String.fromInt gameId
+
+                    LookingForGame ->
+                        "🔍 Looking for game"
+            ]
+        , case opponent.spectatingGame of
+            Just gameId ->
+                span [ Attr.style "margin-left" "10px" ]
+                    [ Html.text ("👀 Spectating game " ++ String.fromInt gameId) ]
+
+            Nothing ->
+                Html.text ""
         ]

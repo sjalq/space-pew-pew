@@ -29,6 +29,7 @@ type alias FrontendModel =
     , lastPong : Time.Posix
     , emaPingTime : Float
     , depressedKeys : Set String
+    , opponents : List Opponent
     }
 
 
@@ -37,6 +38,7 @@ type alias BackendModel =
     , gameStates : Table GameState
     , connectionCurrentGames : Dict ConnectionId GameId
     , lastSeen : Dict ConnectionId Time.Posix
+    , opponents : Dict ConnectionId Opponent
     }
 
 
@@ -53,6 +55,19 @@ type alias ChatMessage =
     , browserId : BrowserId
     , message : String
     }
+
+
+type alias Opponent =
+    { id : ConnectionId
+    , matchState : MatchState
+    , spectatingGame : Maybe GameId
+    }
+
+
+type MatchState
+    = HangingOut
+    | InGame GameId
+    | LookingForGame
 
 
 type FrontendMsg
@@ -75,6 +90,9 @@ type ToBackend
     | AddChat String
     | PingBackend Time.Posix
     | SubmitGameMsgs (List GameMsg)
+      -- Match options
+    | LookForGame
+    | SpectateGame GameId
 
 
 type BackendMsg
@@ -84,6 +102,7 @@ type BackendMsg
     | UpdateClients Time.Posix
     | ClearOldClients Time.Posix
     | HackPingBackend ConnectionId Time.Posix
+
 
 type ToFrontend
     = NoOpToFrontend

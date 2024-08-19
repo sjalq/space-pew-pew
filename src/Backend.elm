@@ -5,6 +5,7 @@ import Dict
 import GameLoop
 import L
 import Lamdera
+import List.Extra as List
 import Set
 import Table
 import Time
@@ -55,6 +56,7 @@ init =
     ( { gameStates = Table.empty
       , connectionCurrentGames = Dict.empty
       , lastSeen = Dict.empty
+      , opponents = Dict.empty
       , globalFun =
             { gameCount = 0
             , pewsPewed = 0
@@ -163,7 +165,7 @@ update msg model =
                 newModel =
                     { model | lastSeen = model.lastSeen |> Dict.insert connectionId time }
             in
-            ( newModel, Cmd.none)
+            ( newModel, Cmd.none )
 
 
 updateFromFrontend : BrowserId -> ConnectionId -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
@@ -257,3 +259,70 @@ updateFromFrontend browserId connectionId msg model =
                     { model | lastSeen = model.lastSeen |> Dict.insert connectionId time }
             in
             ( newModel, L.sendToFrontend connectionId Pong )
+
+        LookForGame ->
+            case firstOpponent model of
+                Just opponent ->
+                    let
+                        newModel =
+                            startGame connectionId opponent.id model
+                    in
+                    ( newModel, Cmd.none )
+
+                Nothing ->
+                    let
+                        newModel =
+                            model.opponents
+                                |> Dict.get connectionId
+                                |> Maybe.map (\opponent -> { opponent | matchState = LookingForGame })
+                                |> Maybe.map (\opponent -> Dict.insert connectionId opponent model.opponents)
+                                |> Maybe.map (\opponents -> { model | opponents = opponents })
+                                |> Maybe.withDefault model
+                    in
+                    ( newModel, Cmd.none )
+
+        SpectateGame gameId ->
+            let
+                newModel =
+                    model.opponents
+                        |> Dict.get connectionId
+                        |> Maybe.map (\opponent -> { opponent | spectatingGame = Just gameId })
+                        |> Maybe.map (\opponent -> Dict.insert connectionId opponent model.opponents)
+                        |> Maybe.map (\opponents -> { model | opponents = opponents })
+                        |> Maybe.withDefault model
+            in
+            ( newModel, Cmd.none )
+
+
+firstOpponent : Model -> Maybe Opponent
+firstOpponent model =
+    model.opponents
+        |> Dict.values
+        |> List.find (\opponent -> opponent.matchState == LookingForGame)
+
+
+startGame : ConnectionId -> ConnectionId -> Model -> Model
+startGame player1Id player2Id model =
+    let
+        newGameCount =
+            model.globalFun.gameCount + 1
+
+        ( gameId, newGames ) =
+            model.gameStates
+                |> Table.insertReturningId (GameLoop.initState newGameCount player1Id player2Id)
+
+        newOpponents =
+            model.opponents
+                |> Dict.insert player1Id (Opponent player2Id (InGame gameId) Nothing)
+                |> Dict.insert player2Id (Opponent player1Id (InGame gameId) Nothing)
+
+        oldGlobalFun =
+            model.globalFun
+
+        newGlobalFun =
+            { oldGlobalFun | gameCount = newGameCount }
+
+        newModel =
+            { model | gameStates = newGames, opponents = newOpponents, globalFun = newGlobalFun }
+    in
+    newModel

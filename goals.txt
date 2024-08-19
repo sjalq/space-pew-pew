@@ -47,3 +47,5 @@
 
 2024-08-19
 ----------
+* Make a lobby to find games
+! Eventually make it a full ELO matching system
