@@ -248,7 +248,7 @@ ship_fireProjectile body =
                                     angleToV rec.initialSpeed ship.rotation
                                         |> addV body.velocity
                             in
-                            { id = 0
+                            { id = -1
                             , radius = 2
                             , position = addV body.position (angleToV body.radius ship.rotation)
                             , velocity = addV body.velocity initialVelocity
@@ -265,7 +265,7 @@ ship_fireProjectile body =
                             }
 
                         Photonic rec ->
-                            { id = 0
+                            { id = -1
                             , radius = 2
                             , position = body.position
                             , velocity = body.velocity

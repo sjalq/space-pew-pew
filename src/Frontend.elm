@@ -3,7 +3,7 @@ module Frontend exposing (..)
 import Browser exposing (UrlRequest(..))
 import Browser.Events
 import Browser.Navigation as Nav
-import GameLoop 
+import GameLoop
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events
@@ -39,7 +39,7 @@ subscriptions : Model -> Sub FrontendMsg
 subscriptions _ =
     Sub.batch
         [ keySubs
-        , Time.every 10000 Ping
+        , Time.every 1000 Ping
         , Time.every moment UpdateGame
         ]
 

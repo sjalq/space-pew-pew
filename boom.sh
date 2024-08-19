@@ -1,3 +1,4 @@
-rm -rf ~/.elm ~/dev/git/player-stocks/elm-stuff
+rm -rf ~/.elm ~/dev/git/space-pew-pew/elm-stuff
 rm -rf ./elm-stuff
-lamdera reset
+yes | lamdera reset
+lamdera live
