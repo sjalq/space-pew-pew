@@ -67,8 +67,12 @@ init _ key =
       , emaPingTime = 0
       , depressedKeys = Set.empty
       , opponents = []
+      , activeGames = []
       }
-    , L.sendToBackend StartNewGame
+    , Cmd.batch
+        [ L.sendToBackend StartNewGame
+        , L.sendToBackend RequestActiveGames
+        ]
     )
 
 
@@ -138,14 +142,10 @@ update msg model =
                 gameMsgs =
                     model.depressedKeys |> GameLoop.keysToGameMsgs
             in
-            ( model
-              --     { model
-              --     | gameState =
-              --         model.gameState
-              --             |> GameLoop.updateMsg (FrameTick model.depressedKeys time)
-              --   }
-            , L.sendToBackend (SubmitGameMsgs gameMsgs)
-            )
+            ( model, L.sendToBackend (SubmitGameMsgs gameMsgs) )
+
+        Passthrough msg_ ->
+            ( model, L.sendToBackend msg_ )
 
 
 updateFromBackend : ToFrontend -> Model -> ( Model, Cmd FrontendMsg )
@@ -168,6 +168,9 @@ updateFromBackend msg model =
 
         Pong ->
             ( model, L.performWithTime PongWithTime )
+
+        UpdateActiveGames games ->
+            ( { model | activeGames = games }, Cmd.none )
 
 
 view : Model -> Browser.Document FrontendMsg
@@ -193,6 +196,7 @@ view model =
                     ]
                     [ drawKeyboardLayoutLeft model
                     , drawOpponents model
+                    , drawActiveGames model
                     ]
                 , Html.div
                     [ Attr.style "font-family" "sans-serif"
@@ -404,4 +408,28 @@ drawOpponent opponent =
 
             Nothing ->
                 Html.text ""
+        ]
+
+
+drawActiveGames : Model -> Html FrontendMsg
+drawActiveGames model =
+    div [ Attr.style "width" "250px", Attr.style "border" "1px solid #ccc", Attr.style "margin" "20px auto" ]
+        [ h3 [] [ Html.text "Active Games" ]
+        , div
+            [ Attr.style "height" "300px"
+            , Attr.style "overflow-y" "scroll"
+            , Attr.style "padding" "10px"
+            , Attr.style "background-color" "#f0f0f0"
+            ]
+            (List.map drawGameSummary model.activeGames)
+        , Html.button [ Html.Events.onClick (Passthrough RequestActiveGames) ] [ Html.text "Refresh" ]
+        ]
+
+
+drawGameSummary : GameSummary -> Html FrontendMsg
+drawGameSummary game =
+    div [ Attr.style "margin-bottom" "10px" ]
+        [ Html.text ("Game " ++ String.fromInt game.id)
+        , Html.br [] []
+        , Html.text (game.player1 ++ " vs " ++ game.player2)
         ]

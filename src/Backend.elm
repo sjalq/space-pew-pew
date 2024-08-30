@@ -293,6 +293,24 @@ updateFromFrontend browserId connectionId msg model =
             in
             ( newModel, Cmd.none )
 
+        -- Add this new case
+        RequestActiveGames ->
+            let
+                activeGames =
+                    model.gameStates
+                        |> Table.toList
+                        |> List.map
+                            (\game ->
+                                GameSummary
+                                    game.id
+                                    (game.player1Id |> String.left 6)
+                                    (game.player2Id |> String.left 6)
+                            )
+            in
+            ( model
+            , L.sendToFrontend connectionId (UpdateActiveGames activeGames)
+            )
+
 
 firstOpponent : Model -> Maybe Opponent
 firstOpponent model =

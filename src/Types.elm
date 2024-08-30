@@ -30,6 +30,7 @@ type alias FrontendModel =
     , emaPingTime : Float
     , depressedKeys : Set String
     , opponents : List Opponent
+    , activeGames : List GameSummary
     }
 
 
@@ -64,6 +65,13 @@ type alias Opponent =
     }
 
 
+type alias GameSummary =
+    { id : GameId
+    , player1 : ConnectionId
+    , player2 : ConnectionId
+    }
+
+
 type MatchState
     = HangingOut
     | InGame GameId
@@ -74,6 +82,7 @@ type FrontendMsg
     = UrlClicked UrlRequest
     | UrlChanged Url
     | NoOpFrontendMsg
+    | Passthrough ToBackend
     | Input InputMsg
     | UpdateGame Time.Posix
     | NewGame
@@ -93,6 +102,7 @@ type ToBackend
       -- Match options
     | LookForGame
     | SpectateGame GameId
+    | RequestActiveGames
 
 
 type BackendMsg
@@ -109,6 +119,7 @@ type ToFrontend
     | UpdateGlobal GlobalFun
     | UpdateGameState GameState
     | Pong
+    | UpdateActiveGames (List GameSummary)
 
 
 
