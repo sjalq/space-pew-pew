@@ -11,7 +11,8 @@ import Json.Decode as Decode
 import L
 import Lamdera
 import Physics exposing (..)
-import RenderSvg exposing (renderGame)
+import RenderWebGL exposing (renderGame, renderModelViewer)
+import Html.Events exposing (onInput)
 import Set
 import Svg exposing (..)
 import Table exposing (insertMaybe)
@@ -53,6 +54,20 @@ init url key =
       , pewsPewed = 0
       , chatInput = ""
       , trollbox = []
+      , viewMode = GameView
+      , modelViewer = 
+          { selectedObject = ModelHumanShip
+          , rotationX = 0
+          , rotationY = 0
+          , rotationZ = 0
+          , zoom = 300
+          , autoRotate = True
+          , wireframe = False
+          , colorR = 0.8
+          , colorG = 0.8
+          , colorB = 0.85
+          , useCustomColor = False
+          }
       }
     , L.sendToBackend NewGameStarted
     )
@@ -99,6 +114,97 @@ update msg model =
 
         ChatInputChanged newInput ->
             ( { model | chatInput = newInput }, Cmd.none )
+        
+        ToggleViewMode ->
+            ( { model | viewMode = 
+                case model.viewMode of
+                    GameView -> ModelViewerView
+                    ModelViewerView -> GameView 
+              }
+            , Cmd.none )
+        
+        SelectModel obj ->
+            let
+                viewer = model.modelViewer
+            in
+            ( { model | modelViewer = { viewer | selectedObject = obj } }, Cmd.none )
+        
+        UpdateRotationX value ->
+            let
+                viewer = model.modelViewer
+            in
+            ( { model | modelViewer = { viewer | rotationX = value } }, Cmd.none )
+        
+        UpdateRotationY value ->
+            let
+                viewer = model.modelViewer
+            in
+            ( { model | modelViewer = { viewer | rotationY = value } }, Cmd.none )
+        
+        UpdateRotationZ value ->
+            let
+                viewer = model.modelViewer
+            in
+            ( { model | modelViewer = { viewer | rotationZ = value } }, Cmd.none )
+        
+        UpdateZoom value ->
+            let
+                viewer = model.modelViewer
+            in
+            ( { model | modelViewer = { viewer | zoom = value } }, Cmd.none )
+        
+        ToggleAutoRotate ->
+            let
+                viewer = model.modelViewer
+            in
+            ( { model | modelViewer = { viewer | autoRotate = not viewer.autoRotate } }, Cmd.none )
+        
+        ToggleWireframe ->
+            let
+                viewer = model.modelViewer
+            in
+            ( { model | modelViewer = { viewer | wireframe = not viewer.wireframe } }, Cmd.none )
+        
+        ResetModelViewer ->
+            ( { model | modelViewer = 
+                { selectedObject = model.modelViewer.selectedObject
+                , rotationX = 0
+                , rotationY = 0
+                , rotationZ = 0
+                , zoom = 300
+                , autoRotate = True
+                , wireframe = False
+                , colorR = 0.8
+                , colorG = 0.8
+                , colorB = 0.85
+                , useCustomColor = False
+                }
+              }
+            , Cmd.none )
+        
+        UpdateColorR value ->
+            let
+                viewer = model.modelViewer
+            in
+            ( { model | modelViewer = { viewer | colorR = value } }, Cmd.none )
+        
+        UpdateColorG value ->
+            let
+                viewer = model.modelViewer
+            in
+            ( { model | modelViewer = { viewer | colorG = value } }, Cmd.none )
+        
+        UpdateColorB value ->
+            let
+                viewer = model.modelViewer
+            in
+            ( { model | modelViewer = { viewer | colorB = value } }, Cmd.none )
+        
+        ToggleCustomColor ->
+            let
+                viewer = model.modelViewer
+            in
+            ( { model | modelViewer = { viewer | useCustomColor = not viewer.useCustomColor } }, Cmd.none )
 
 
 updateFromBackend : ToFrontend -> Model -> ( Model, Cmd FrontendMsg )
@@ -121,16 +227,37 @@ view : Model -> Browser.Document FrontendMsg
 view model =
     { title = ""
     , body =
-        let
-            oldGameState =
-                model.gameState
+        [ Html.div [ Attr.style "text-align" "center", Attr.style "padding-top" "20px" ]
+            [ Html.button 
+                [ Html.Events.onClick ToggleViewMode
+                , Attr.style "font-size" "16px"
+                , Attr.style "padding" "10px 20px"
+                , Attr.style "margin-bottom" "20px"
+                ]
+                [ Html.text (if model.viewMode == GameView then "Switch to Model Viewer" else "Back to Game") ]
+            , case model.viewMode of
+                GameView ->
+                    viewGame model
+                
+                ModelViewerView ->
+                    viewModelViewer model
+            ]
+        ]
+    }
 
-            gameState =
-                { oldGameState
-                    | entropyCount = model.gameCount
-                }
-        in
-        [ Html.div [ Attr.style "text-align" "center", Attr.style "padding-top" "40px" ]
+
+viewGame : Model -> Html FrontendMsg
+viewGame model =
+    let
+        oldGameState =
+            model.gameState
+
+        gameState =
+            { oldGameState
+                | entropyCount = model.gameCount
+            }
+    in
+    Html.div [ Attr.style "text-align" "center" ]
             [ Html.img [ Attr.src "https://lamdera.app/lamdera-logo-black.png", Attr.width 150 ] []
             , Html.div [ Attr.style "display" "flex", Attr.style "justify-content" "space-between" ]
                 [ drawKeyboardLayoutLeft model
@@ -150,8 +277,7 @@ view model =
                     , drawTrollbox model
                     ]
                 ]
-            ]
-        , Html.div [ Attr.style "text-align" "center", Attr.style "padding-top" "20px" ]
+            , Html.div [ Attr.style "text-align" "center", Attr.style "padding-top" "20px" ]
             [ Html.button
                 [ Attr.style "font-size" "16px"
                 , Attr.style "padding" "10px 20px"
@@ -164,8 +290,214 @@ view model =
                 , Html.text ("Pews Pewed: " ++ String.fromInt model.pewsPewed)
                 ]
             ]
+            ]
+
+
+viewModelViewer : Model -> Html FrontendMsg
+viewModelViewer model =
+    Html.div []
+        [ Html.div [ Attr.style "padding" "20px", Attr.style "background" "#f0f0f0", Attr.style "border-radius" "8px", Attr.style "margin" "20px auto", Attr.style "max-width" "900px" ]
+            [ Html.h2 [] [ Html.text "3D Model Viewer" ]
+            , Html.div [ Attr.style "display" "flex", Attr.style "gap" "20px" ]
+                [ -- Controls panel
+                  Html.div [ Attr.style "flex" "0 0 250px" ]
+                    [ Html.h3 [] [ Html.text "Controls" ]
+                    
+                    -- Object selector
+                    , Html.div [ Attr.style "margin-bottom" "15px" ]
+                        [ Html.label [] [ Html.text "Select Model: " ]
+                        , Html.select [ Html.Events.onInput (\s -> SelectModel (stringToModelObject s)) ]
+                            [ Html.option [ Attr.value "HumanShip" ] [ Html.text "Human Fighter Ship" ]
+                            , Html.option [ Attr.value "Saucer" ] [ Html.text "UFO Saucer" ]
+                            , Html.option [ Attr.value "Planet" ] [ Html.text "Planet" ]
+                            , Html.option [ Attr.value "Projectile" ] [ Html.text "Projectile" ]
+                            ]
+                        ]
+                    
+                    -- Rotation sliders
+                    , Html.div [ Attr.style "margin-bottom" "10px" ]
+                        [ Html.label [] [ Html.text ("Rotation X: " ++ String.fromFloat model.modelViewer.rotationX ++ "°") ]
+                        , Html.br [] []
+                        , Html.input 
+                            [ Attr.type_ "range"
+                            , Attr.min "-180"
+                            , Attr.max "180"
+                            , Attr.value (String.fromFloat model.modelViewer.rotationX)
+                            , Html.Events.onInput (String.toFloat >> Maybe.withDefault 0 >> UpdateRotationX)
+                            , Attr.style "width" "100%"
+                            ] []
+                        ]
+                    
+                    , Html.div [ Attr.style "margin-bottom" "10px" ]
+                        [ Html.label [] [ Html.text ("Rotation Y: " ++ String.fromFloat model.modelViewer.rotationY ++ "°") ]
+                        , Html.br [] []
+                        , Html.input 
+                            [ Attr.type_ "range"
+                            , Attr.min "-180"
+                            , Attr.max "180"
+                            , Attr.value (String.fromFloat model.modelViewer.rotationY)
+                            , Html.Events.onInput (String.toFloat >> Maybe.withDefault 0 >> UpdateRotationY)
+                            , Attr.style "width" "100%"
+                            ] []
+                        ]
+                    
+                    , Html.div [ Attr.style "margin-bottom" "10px" ]
+                        [ Html.label [] [ Html.text ("Rotation Z: " ++ String.fromFloat model.modelViewer.rotationZ ++ "°") ]
+                        , Html.br [] []
+                        , Html.input 
+                            [ Attr.type_ "range"
+                            , Attr.min "-180"
+                            , Attr.max "180"
+                            , Attr.value (String.fromFloat model.modelViewer.rotationZ)
+                            , Html.Events.onInput (String.toFloat >> Maybe.withDefault 0 >> UpdateRotationZ)
+                            , Attr.style "width" "100%"
+                            ] []
+                        ]
+                    
+                    -- Zoom slider
+                    , Html.div [ Attr.style "margin-bottom" "10px" ]
+                        [ Html.label [] [ Html.text ("Zoom: " ++ String.fromFloat model.modelViewer.zoom) ]
+                        , Html.br [] []
+                        , Html.input 
+                            [ Attr.type_ "range"
+                            , Attr.min "100"
+                            , Attr.max "500"
+                            , Attr.value (String.fromFloat model.modelViewer.zoom)
+                            , Html.Events.onInput (String.toFloat >> Maybe.withDefault 300 >> UpdateZoom)
+                            , Attr.style "width" "100%"
+                            ] []
+                        ]
+                    
+                    -- Color controls
+                    , Html.div [ Attr.style "margin-top" "20px", Attr.style "padding-top" "20px", Attr.style "border-top" "1px solid #ccc" ]
+                        [ Html.h4 [] [ Html.text "Color Customization" ]
+                        , Html.div [ Attr.style "margin-bottom" "10px" ]
+                            [ Html.button
+                                [ Html.Events.onClick ToggleCustomColor
+                                , Attr.style "padding" "5px 10px"
+                                , Attr.style "width" "100%"
+                                , Attr.style "background-color" (if model.modelViewer.useCustomColor then "#4CAF50" else "#f0f0f0")
+                                , Attr.style "color" (if model.modelViewer.useCustomColor then "white" else "black")
+                                ]
+                                [ Html.text (if model.modelViewer.useCustomColor then "Custom Colors ON" else "Use Default Colors") ]
+                            ]
+                        
+                        , if model.modelViewer.useCustomColor then
+                            Html.div []
+                                [ Html.div [ Attr.style "margin-bottom" "10px" ]
+                                    [ Html.label [] [ Html.text ("Red: " ++ String.fromInt (round (model.modelViewer.colorR * 255))) ]
+                                    , Html.br [] []
+                                    , Html.input 
+                                        [ Attr.type_ "range"
+                                        , Attr.min "0"
+                                        , Attr.max "1"
+                                        , Attr.step "0.01"
+                                        , Attr.value (String.fromFloat model.modelViewer.colorR)
+                                        , Html.Events.onInput (String.toFloat >> Maybe.withDefault 0.5 >> UpdateColorR)
+                                        , Attr.style "width" "100%"
+                                        , Attr.style "background" ("linear-gradient(to right, black, red)")
+                                        ] []
+                                    ]
+                                
+                                , Html.div [ Attr.style "margin-bottom" "10px" ]
+                                    [ Html.label [] [ Html.text ("Green: " ++ String.fromInt (round (model.modelViewer.colorG * 255))) ]
+                                    , Html.br [] []
+                                    , Html.input 
+                                        [ Attr.type_ "range"
+                                        , Attr.min "0"
+                                        , Attr.max "1"
+                                        , Attr.step "0.01"
+                                        , Attr.value (String.fromFloat model.modelViewer.colorG)
+                                        , Html.Events.onInput (String.toFloat >> Maybe.withDefault 0.5 >> UpdateColorG)
+                                        , Attr.style "width" "100%"
+                                        , Attr.style "background" ("linear-gradient(to right, black, green)")
+                                        ] []
+                                    ]
+                                
+                                , Html.div [ Attr.style "margin-bottom" "10px" ]
+                                    [ Html.label [] [ Html.text ("Blue: " ++ String.fromInt (round (model.modelViewer.colorB * 255))) ]
+                                    , Html.br [] []
+                                    , Html.input 
+                                        [ Attr.type_ "range"
+                                        , Attr.min "0"
+                                        , Attr.max "1"
+                                        , Attr.step "0.01"
+                                        , Attr.value (String.fromFloat model.modelViewer.colorB)
+                                        , Html.Events.onInput (String.toFloat >> Maybe.withDefault 0.5 >> UpdateColorB)
+                                        , Attr.style "width" "100%"
+                                        , Attr.style "background" ("linear-gradient(to right, black, blue)")
+                                        ] []
+                                    ]
+                                
+                                -- Color preview
+                                , Html.div 
+                                    [ Attr.style "width" "100%"
+                                    , Attr.style "height" "30px"
+                                    , Attr.style "background-color" (rgbToHex model.modelViewer.colorR model.modelViewer.colorG model.modelViewer.colorB)
+                                    , Attr.style "border" "1px solid #333"
+                                    , Attr.style "border-radius" "4px"
+                                    ]
+                                    []
+                                ]
+                          else
+                            Html.text ""
+                        ]
+                    
+                    -- Toggle buttons
+                    , Html.div [ Attr.style "margin-bottom" "10px" ]
+                        [ Html.button
+                            [ Html.Events.onClick ToggleAutoRotate
+                            , Attr.style "padding" "5px 10px"
+                            , Attr.style "margin-right" "10px"
+                            ]
+                            [ Html.text (if model.modelViewer.autoRotate then "Stop Auto-Rotate" else "Start Auto-Rotate") ]
+                        
+                        ]
+                    
+                    , Html.div []
+                        [ Html.button
+                            [ Html.Events.onClick ResetModelViewer
+                            , Attr.style "padding" "5px 10px"
+                            ]
+                            [ Html.text "Reset View" ]
+                        ]
+                    ]
+                
+                -- 3D View
+                , Html.div [ Attr.style "flex" "1" ]
+                    [ renderModelViewer model.modelViewer model.gameCount
+                    ]
+                ]
+            ]
         ]
-    }
+
+
+stringToModelObject : String -> ModelObject
+stringToModelObject str =
+    case str of
+        "HumanShip" -> ModelHumanShip
+        "Saucer" -> ModelSaucer  
+        "Planet" -> ModelPlanet
+        "Projectile" -> ModelProjectile
+        _ -> ModelHumanShip
+
+
+rgbToHex : Float -> Float -> Float -> String
+rgbToHex r g b =
+    let
+        toHexComponent : Float -> String
+        toHexComponent value =
+            let
+                intValue = round (value * 255)
+                hex = String.fromInt intValue
+            in
+            "rgb(" ++ String.fromInt (round (r * 255)) ++ ", " 
+                   ++ String.fromInt (round (g * 255)) ++ ", " 
+                   ++ String.fromInt (round (b * 255)) ++ ")"
+    in
+    "rgb(" ++ String.fromInt (round (r * 255)) ++ ", " 
+           ++ String.fromInt (round (g * 255)) ++ ", " 
+           ++ String.fromInt (round (b * 255)) ++ ")"
 
 
 gameMsgToFrontendMsg : GameMsg -> FrontendMsg

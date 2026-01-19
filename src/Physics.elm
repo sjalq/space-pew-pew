@@ -503,10 +503,10 @@ rotate direction body =
                 Ship ship ->
                     case direction of
                         Left ->
-                            Ship { ship | rotation = ship.rotation - ship.rotationSpeed }
+                            Ship { ship | rotation = ship.rotation + ship.rotationSpeed }
 
                         Right ->
-                            Ship { ship | rotation = ship.rotation + ship.rotationSpeed }
+                            Ship { ship | rotation = ship.rotation - ship.rotationSpeed }
 
                 _ ->
                     body.bodyType

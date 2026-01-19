@@ -17,7 +17,33 @@ type alias FrontendModel =
     , pewsPewed : Int
     , chatInput : String
     , trollbox : List ChatMessage
+    , viewMode : ViewMode
+    , modelViewer : ModelViewerState
     }
+
+type ViewMode
+    = GameView
+    | ModelViewerView
+
+type alias ModelViewerState =
+    { selectedObject : ModelObject
+    , rotationX : Float
+    , rotationY : Float
+    , rotationZ : Float
+    , zoom : Float
+    , autoRotate : Bool
+    , wireframe : Bool
+    , colorR : Float
+    , colorG : Float
+    , colorB : Float
+    , useCustomColor : Bool
+    }
+
+type ModelObject
+    = ModelHumanShip
+    | ModelSaucer
+    | ModelPlanet
+    | ModelProjectile
 
 
 type alias BackendModel =
@@ -41,6 +67,19 @@ type FrontendMsg
     | NewGame
     | SendChat 
     | ChatInputChanged String
+    | ToggleViewMode
+    | SelectModel ModelObject
+    | UpdateRotationX Float
+    | UpdateRotationY Float
+    | UpdateRotationZ Float
+    | UpdateZoom Float
+    | ToggleAutoRotate
+    | ToggleWireframe
+    | ResetModelViewer
+    | UpdateColorR Float
+    | UpdateColorG Float
+    | UpdateColorB Float
+    | ToggleCustomColor
 
 
 type ToBackend
